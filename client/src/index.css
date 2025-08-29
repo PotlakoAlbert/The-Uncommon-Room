@@ -1,69 +1,70 @@
 @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
 @import url('https://fonts.googleapis.com/icon?family=Material+Icons');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: hsl(210, 20%, 98%);
-  --foreground: hsl(210, 40%, 8%);
-  --card: hsl(0, 0%, 100%);
-  --card-foreground: hsl(210, 40%, 8%);
-  --popover: hsl(0, 0%, 100%);
-  --popover-foreground: hsl(210, 40%, 8%);
-  --primary: hsl(122, 39%, 49%);
-  --primary-foreground: hsl(0, 0%, 100%);
-  --secondary: hsl(122, 24%, 79%);
-  --secondary-foreground: hsl(122, 47%, 24%);
-  --muted: hsl(210, 40%, 96%);
-  --muted-foreground: hsl(215, 16%, 47%);
-  --accent: hsl(45, 100%, 51%);
-  --accent-foreground: hsl(210, 40%, 8%);
-  --destructive: hsl(14, 100%, 57%);
-  --destructive-foreground: hsl(0, 0%, 100%);
-  --border: hsl(214, 32%, 91%);
-  --input: hsl(214, 32%, 91%);
-  --ring: hsl(122, 39%, 49%);
-  --radius: 8px;
-  --font-sans: 'Roboto', sans-serif;
-  --font-serif: Georgia, serif;
-  --font-mono: Menlo, monospace;
-}
-
-.dark {
-  --background: hsl(210, 20%, 2%);
-  --foreground: hsl(210, 10%, 95%);
-  --card: hsl(210, 20%, 5%);
-  --card-foreground: hsl(210, 10%, 90%);
-  --popover: hsl(210, 20%, 5%);
-  --popover-foreground: hsl(210, 10%, 90%);
-  --primary: hsl(122, 39%, 49%);
-  --primary-foreground: hsl(0, 0%, 100%);
-  --secondary: hsl(122, 24%, 25%);
-  --secondary-foreground: hsl(122, 24%, 79%);
-  --muted: hsl(210, 20%, 10%);
-  --muted-foreground: hsl(215, 16%, 60%);
-  --accent: hsl(45, 100%, 51%);
-  --accent-foreground: hsl(210, 40%, 8%);
-  --destructive: hsl(14, 100%, 57%);
-  --destructive-foreground: hsl(0, 0%, 100%);
-  --border: hsl(214, 20%, 15%);
-  --input: hsl(214, 20%, 15%);
-  --ring: hsl(122, 39%, 49%);
-}
-
 @layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+    --primary: 142 76% 36%;
+    --primary-foreground: 355.7 100% 97.3%;
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 142 76% 36%;
+    --radius: 0.5rem;
+  }
+ 
+  .dark {
+    --background: 20 14.3% 4.1%;
+    --foreground: 0 0% 95%;
+    --card: 24 9.8% 10%;
+    --card-foreground: 0 0% 95%;
+    --popover: 0 0% 9%;
+    --popover-foreground: 0 0% 95%;
+    --primary: 142 70.6% 45.3%;
+    --primary-foreground: 144.9 80.4% 10%;
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 15%;
+    --muted-foreground: 240 5% 64.9%;
+    --accent: 12 6.5% 15.1%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 85.7% 97.3%;
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 142 76% 36%;
+  }
+
   * {
-    @apply border-border;
+    border-color: hsl(var(--border));
   }
 
   body {
-    @apply bg-background text-foreground font-sans antialiased;
-    font-family: var(--font-sans);
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-family: 'Roboto', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    @apply font-medium;
+    font-weight: 500;
   }
 }
 
@@ -97,6 +98,7 @@
     white-space: nowrap;
     word-wrap: normal;
     direction: ltr;
+    font-feature-settings: 'liga';
     -webkit-font-feature-settings: 'liga';
     -webkit-font-smoothing: antialiased;
   }

@@ -1,8 +1,10 @@
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { Provider } from "react-redux";
-import { store } from "./store/store";
+import { Provider, useSelector, useDispatch } from "react-redux";
+import { store, RootState } from "./store/store";
+import { fetchServerCart, setCartAuthentication } from "./store/cartSlice";
+import { useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Layout from "@/components/Layout";
@@ -29,6 +31,21 @@ import AdminCustomDesigns from "@/pages/admin/AdminCustomDesigns";
 import NotFound from "@/pages/not-found";
 
 function Router() {
+  const dispatch = useDispatch();
+  const { isAuthenticated } = useSelector((state: RootState) => state.auth);
+  const { isAuthenticated: cartIsAuthenticated } = useSelector((state: RootState) => state.cart);
+  
+  // Load server cart for authenticated users on app start
+  // Only fetch if user is authenticated and cart is not already authenticated
+  useEffect(() => {
+    if (isAuthenticated && !cartIsAuthenticated) {
+      dispatch(fetchServerCart());
+    } else if (!isAuthenticated && cartIsAuthenticated) {
+      // Mark cart as unauthenticated when user logs out
+      dispatch(setCartAuthentication(false));
+    }
+  }, [isAuthenticated, cartIsAuthenticated, dispatch]);
+
   return (
     <Switch>
       {/* Public routes */}

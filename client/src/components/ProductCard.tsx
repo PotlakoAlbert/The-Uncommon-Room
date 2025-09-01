@@ -1,6 +1,7 @@
 import { Link } from "wouter";
-import { useDispatch } from "react-redux";
-import { addToCart } from "@/store/cartSlice";
+import { useDispatch, useSelector } from "react-redux";
+import { addToLocalCart, addToServerCart } from "@/store/cartSlice";
+import { RootState } from "@/store/store";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 
@@ -21,21 +22,30 @@ interface ProductCardProps {
 export default function ProductCard({ product }: ProductCardProps) {
   const dispatch = useDispatch();
   const { toast } = useToast();
+  const { isAuthenticated } = useSelector((state: RootState) => state.auth);
 
   const handleAddToCart = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     
     try {
-      // In a real app, this would make an API call
-      dispatch(addToCart({
-        cartItemId: Date.now(), // Temporary ID
-        prodId: product.prodId,
-        name: product.name,
-        price: product.price,
-        quantity: 1,
-        mainImage: product.mainImage,
-      }));
+      if (isAuthenticated) {
+        // User is logged in - sync with server
+        dispatch(addToServerCart({
+          productId: product.prodId,
+          quantity: 1,
+        }));
+      } else {
+        // User is not logged in - add to local cart
+        dispatch(addToLocalCart({
+          cartItemId: Date.now(), // Temporary ID
+          prodId: product.prodId,
+          name: product.name,
+          price: product.price,
+          quantity: 1,
+          mainImage: product.mainImage,
+        }));
+      }
 
       toast({
         title: "Added to Cart",

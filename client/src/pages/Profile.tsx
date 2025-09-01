@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { RootState } from "@/store/store";
-import { updateProfile, logout } from "@/store/authSlice";
+import { updateProfile, logout, forceLogout } from "@/store/authSlice";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -106,12 +106,16 @@ export default function Profile() {
   });
 
   const handleLogout = () => {
-    dispatch(logout());
+    // Use synchronous logout to immediately clear everything
+    dispatch(forceLogout());
+    
     toast({
       title: "Logged Out",
       description: "You have been logged out successfully.",
     });
-    setLocation('/');
+    
+    // Force a page reload to clear any cached state
+    window.location.href = '/';
   };
 
   const onUpdateProfile = (data: ProfileFormData) => {

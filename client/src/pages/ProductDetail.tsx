@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { useDispatch } from "react-redux";
-import { addToCart } from "@/store/cartSlice";
+import { useDispatch, useSelector } from "react-redux";
+import { addToLocalCart, addToServerCart } from "@/store/cartSlice";
+import { RootState } from "@/store/store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -15,6 +16,7 @@ export default function ProductDetail() {
   const [, setLocation] = useLocation();
   const dispatch = useDispatch();
   const { toast } = useToast();
+  const { isAuthenticated } = useSelector((state: RootState) => state.auth);
   const [quantity, setQuantity] = useState(1);
   const [customNotes, setCustomNotes] = useState("");
   const [selectedImage, setSelectedImage] = useState(0);
@@ -31,20 +33,38 @@ export default function ProductDetail() {
   const handleAddToCart = () => {
     if (!product) return;
 
-    dispatch(addToCart({
-      cartItemId: Date.now(),
-      prodId: product.prodId,
-      name: product.name,
-      price: product.price,
-      quantity,
-      customNotes,
-      mainImage: product.mainImage,
-    }));
+    try {
+      if (isAuthenticated) {
+        // User is logged in - sync with server
+        dispatch(addToServerCart({
+          productId: product.prodId,
+          quantity,
+          customNotes,
+        }));
+      } else {
+        // User is not logged in - add to local cart
+        dispatch(addToLocalCart({
+          cartItemId: Date.now(),
+          prodId: product.prodId,
+          name: product.name,
+          price: product.price,
+          quantity,
+          customNotes,
+          mainImage: product.mainImage,
+        }));
+      }
 
-    toast({
-      title: "Added to Cart",
-      description: `${product.name} has been added to your cart.`,
-    });
+      toast({
+        title: "Added to Cart",
+        description: `${product.name} has been added to your cart.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to add item to cart. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   if (error) {

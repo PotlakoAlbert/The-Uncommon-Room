@@ -25,30 +25,40 @@ export default function DesktopNavigation({ isAdminRoute }: DesktopNavigationPro
                   </h1>
                 </Link>
                 <nav className="hidden md:flex space-x-6">
-                  <Link href="/admin/dashboard">
-                    <a className={`${location === '/admin/dashboard' ? 'text-primary' : 'text-muted-foreground'} hover:text-primary transition-colors`} data-testid="link-admin-dashboard">
-                      Dashboard
-                    </a>
+                  <Link
+                    href="/admin/dashboard"
+                    className={`${location === '/admin/dashboard' ? 'text-primary' : 'text-muted-foreground'} hover:text-primary transition-colors`}
+                    data-testid="link-admin-dashboard"
+                  >
+                    Dashboard
                   </Link>
-                  <Link href="/admin/products">
-                    <a className={`${location === '/admin/products' ? 'text-primary' : 'text-muted-foreground'} hover:text-primary transition-colors`} data-testid="link-admin-products">
-                      Products
-                    </a>
+                  <Link
+                    href="/admin/products"
+                    className={`${location === '/admin/products' ? 'text-primary' : 'text-muted-foreground'} hover:text-primary transition-colors`}
+                    data-testid="link-admin-products"
+                  >
+                    Products
                   </Link>
-                  <Link href="/admin/orders">
-                    <a className={`${location === '/admin/orders' ? 'text-primary' : 'text-muted-foreground'} hover:text-primary transition-colors`} data-testid="link-admin-orders">
-                      Orders
-                    </a>
+                  <Link
+                    href="/admin/orders"
+                    className={`${location === '/admin/orders' ? 'text-primary' : 'text-muted-foreground'} hover:text-primary transition-colors`}
+                    data-testid="link-admin-orders"
+                  >
+                    Orders
                   </Link>
-                  <Link href="/admin/customers">
-                    <a className={`${location === '/admin/customers' ? 'text-primary' : 'text-muted-foreground'} hover:text-primary transition-colors`} data-testid="link-admin-customers">
-                      Customers
-                    </a>
+                  <Link
+                    href="/admin/customers"
+                    className={`${location === '/admin/customers' ? 'text-primary' : 'text-muted-foreground'} hover:text-primary transition-colors`}
+                    data-testid="link-admin-customers"
+                  >
+                    Customers
                   </Link>
-                  <Link href="/admin/inquiries">
-                    <a className={`${location === '/admin/inquiries' ? 'text-primary' : 'text-muted-foreground'} hover:text-primary transition-colors`} data-testid="link-admin-inquiries">
-                      Inquiries
-                    </a>
+                  <Link
+                    href="/admin/inquiries"
+                    className={`${location === '/admin/inquiries' ? 'text-primary' : 'text-muted-foreground'} hover:text-primary transition-colors`}
+                    data-testid="link-admin-inquiries"
+                  >
+                    Inquiries
                   </Link>
                 </nav>
               </div>
@@ -79,25 +89,33 @@ export default function DesktopNavigation({ isAdminRoute }: DesktopNavigationPro
                 <h1 className="text-2xl font-bold text-primary" data-testid="text-site-title">The Uncommon Room</h1>
               </Link>
               <nav className="hidden md:flex space-x-6">
-                <Link href="/">
-                  <a className={`${location === '/' ? 'text-foreground' : 'text-muted-foreground'} hover:text-primary transition-colors`} data-testid="link-home">
-                    Home
-                  </a>
+                <Link
+                  href="/"
+                  className={`${location === '/' ? 'text-foreground' : 'text-muted-foreground'} hover:text-primary transition-colors`}
+                  data-testid="link-home"
+                >
+                  Home
                 </Link>
-                <Link href="/products">
-                  <a className={`${location.startsWith('/products') ? 'text-foreground' : 'text-muted-foreground'} hover:text-primary transition-colors`} data-testid="link-products">
-                    Products
-                  </a>
+                <Link
+                  href="/products"
+                  className={`${location.startsWith('/products') ? 'text-foreground' : 'text-muted-foreground'} hover:text-primary transition-colors`}
+                  data-testid="link-products"
+                >
+                  Products
                 </Link>
-                <Link href="/custom-design">
-                  <a className={`${location === '/custom-design' ? 'text-foreground' : 'text-muted-foreground'} hover:text-primary transition-colors`} data-testid="link-custom-design">
-                    Custom Design
-                  </a>
+                <Link
+                  href="/custom-design"
+                  className={`${location === '/custom-design' ? 'text-foreground' : 'text-muted-foreground'} hover:text-primary transition-colors`}
+                  data-testid="link-custom-design"
+                >
+                  Custom Design
                 </Link>
-                <Link href="/inquiry">
-                  <a className={`${location === '/inquiry' ? 'text-foreground' : 'text-muted-foreground'} hover:text-primary transition-colors`} data-testid="link-contact">
-                    Contact
-                  </a>
+                <Link
+                  href="/inquiry"
+                  className={`${location === '/inquiry' ? 'text-foreground' : 'text-muted-foreground'} hover:text-primary transition-colors`}
+                  data-testid="link-contact"
+                >
+                  Contact
                 </Link>
               </nav>
             </div>

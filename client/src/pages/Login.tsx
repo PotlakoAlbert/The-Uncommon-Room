@@ -41,7 +41,7 @@ export default function Login() {
     },
     onSuccess: (data) => {
       dispatch(loginSuccess({
-        user: { ...data.customer, type: 'customer' },
+        user: { ...(data.user || data.customer), type: 'customer' },
         token: data.token,
       }));
       toast({
@@ -51,9 +51,17 @@ export default function Login() {
       setLocation('/');
     },
     onError: (error: any) => {
+      let errorMessage = "Invalid email or password";
+      if (error.message) {
+        if (error.message.includes("No account found")) {
+          errorMessage = "No account found for this email. Please register first.";
+        } else {
+          errorMessage = error.message;
+        }
+      }
       toast({
         title: "Login Failed",
-        description: error.message || "Invalid email or password",
+        description: errorMessage,
         variant: "destructive",
       });
     },
@@ -140,10 +148,8 @@ export default function Login() {
             <div className="mt-6 text-center">
               <p className="text-sm text-muted-foreground">
                 Don't have an account?{" "}
-                <Link href="/register">
-                  <a className="text-primary hover:text-primary/80 font-medium" data-testid="link-register">
-                    Sign up here
-                  </a>
+                <Link href="/register" className="text-primary hover:text-primary/80 font-medium" data-testid="link-register">
+                  Sign up here
                 </Link>
               </p>
             </div>

@@ -1,5 +1,6 @@
-import { useDispatch } from "react-redux";
-import { updateCartItem, removeFromCart } from "@/store/cartSlice";
+import { useDispatch, useSelector } from "react-redux";
+import { updateCartItem, removeFromCart, removeFromServerCart } from "@/store/cartSlice";
+import { RootState } from "@/store/store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,6 +19,7 @@ interface CartItemProps {
 
 export default function CartItem({ item }: CartItemProps) {
   const dispatch = useDispatch();
+  const { isAuthenticated } = useSelector((state: RootState) => state.auth);
 
   const handleQuantityChange = (newQuantity: number) => {
     if (newQuantity > 0) {
@@ -37,7 +39,13 @@ export default function CartItem({ item }: CartItemProps) {
   };
 
   const handleRemove = () => {
-    dispatch(removeFromCart(item.cartItemId));
+    if (isAuthenticated) {
+      // User is authenticated - remove from server
+      dispatch(removeFromServerCart(item.cartItemId));
+    } else {
+      // User is not authenticated - remove from local cart only
+      dispatch(removeFromCart(item.cartItemId));
+    }
   };
 
   return (

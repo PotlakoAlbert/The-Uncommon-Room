@@ -20,7 +20,7 @@ const registerSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
   password: z.string().min(6, "Password must be at least 6 characters"),
   confirmPassword: z.string(),
-  phone: z.string().optional(),
+  phone: z.string().max(50, "Phone number is too long").optional(),
   address: z.string().optional(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
@@ -54,7 +54,7 @@ export default function Register() {
     },
     onSuccess: (data) => {
       dispatch(loginSuccess({
-        user: { ...data.customer, type: 'customer' },
+        user: { ...(data.user || data.customer), type: 'customer' },
         token: data.token,
       }));
       toast({
@@ -64,9 +64,19 @@ export default function Register() {
       setLocation('/');
     },
     onError: (error: any) => {
+      let errorMessage = "Failed to create account";
+      if (error.message) {
+        if (error.message.includes("Email already registered")) {
+          errorMessage = "This email is already registered. Please try logging in instead.";
+        } else if (error.message.includes("too long")) {
+          errorMessage = "One of the fields is too long. Please check your phone number.";
+        } else {
+          errorMessage = error.message;
+        }
+      }
       toast({
         title: "Registration Failed",
-        description: error.message || "Failed to create account",
+        description: errorMessage,
         variant: "destructive",
       });
     },
@@ -228,10 +238,8 @@ export default function Register() {
             <div className="mt-6 text-center">
               <p className="text-sm text-muted-foreground">
                 Already have an account?{" "}
-                <Link href="/login">
-                  <a className="text-primary hover:text-primary/80 font-medium" data-testid="link-login">
-                    Sign in here
-                  </a>
+                <Link href="/login" className="text-primary hover:text-primary/80 font-medium" data-testid="link-login">
+                  Sign in here
                 </Link>
               </p>
             </div>

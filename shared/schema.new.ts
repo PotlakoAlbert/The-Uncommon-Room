@@ -83,22 +83,15 @@ export const users = pgTable("users", {
   email: varchar("email", { length: 255 }).unique().notNull(),
   passwordHash: varchar("password_hash", { length: 255 }).notNull(),
   role: roleEnum("role").default("user").notNull(),
-  phone: varchar("phone", { length: 50 }),
+  phone: varchar("phone", { length: 20 }),
   address: text("address"),
   refreshToken: text("refresh_token"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const carts = pgTable("carts", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").references(() => users.id).notNull(),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
-
 export const products = pgTable("products", {
-  prodId: serial("prod_id").primaryKey(),
+  id: serial("id").primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
@@ -112,13 +105,9 @@ export const products = pgTable("products", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const admins = pgTable("admins", {
-  adminId: serial("admin_id").primaryKey(),
-  name: varchar("name", { length: 255 }).notNull(),
-  phone: varchar("phone", { length: 20 }),
-  address: text("address"),
-  email: varchar("email", { length: 255 }).unique().notNull(),
-  passwordHash: varchar("password_hash", { length: 255 }).notNull(),
+export const carts = pgTable("carts", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -126,9 +115,8 @@ export const admins = pgTable("admins", {
 export const cartItems = pgTable("cart_items", {
   id: serial("id").primaryKey(),
   cartId: integer("cart_id").references(() => carts.id),
-  productId: integer("product_id").references(() => products.prodId),
+  productId: integer("product_id").references(() => products.id),
   quantity: integer("quantity").notNull().default(1),
-  customNotes: text("custom_notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -149,7 +137,7 @@ export const orders = pgTable("orders", {
 export const orderItems = pgTable("order_items", {
   id: serial("id").primaryKey(),
   orderId: integer("order_id").references(() => orders.id),
-  productId: integer("product_id").references(() => products.prodId),
+  productId: integer("product_id").references(() => products.id),
   unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
   quantity: integer("quantity").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
@@ -170,10 +158,11 @@ export const deliveries = pgTable("deliveries", {
 
 export const inventory = pgTable("inventory", {
   id: serial("id").primaryKey(),
-  productId: integer("product_id").references(() => products.prodId),
+  productId: integer("product_id").references(() => products.id),
   quantity: integer("quantity").notNull().default(0),
   costPrice: decimal("cost_price", { precision: 10, scale: 2 }),
-  lastUpdated: timestamp("last_updated").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const suppliers = pgTable("suppliers", {
@@ -191,7 +180,7 @@ export const inquiries = pgTable("inquiries", {
   email: varchar("email", { length: 255 }).notNull(),
   subject: varchar("subject", { length: 255 }),
   message: text("message").notNull(),
-  productId: integer("product_id").references(() => products.prodId),
+  productId: integer("product_id").references(() => products.id),
   inquiryType: inquiryTypeEnum("inquiry_type").default("general"),
   status: inquiryStatusEnum("status").default("new"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -215,39 +204,17 @@ export const customDesignRequests = pgTable("custom_design_requests", {
 });
 
 // Relations
-
-
 export const productsRelations = relations(products, ({ many }) => ({
   cartItems: many(cartItems),
   orderItems: many(orderItems),
-  inventory: many(inventory),
   inquiries: many(inquiries),
+  inventory: many(inventory),
 }));
 
 export const usersRelations = relations(users, ({ many }) => ({
-  orders: many(orders),
   carts: many(carts),
+  orders: many(orders),
   customDesignRequests: many(customDesignRequests),
-}));
-
-export const ordersRelations = relations(orders, ({ one, many }) => ({
-  user: one(users, {
-    fields: [orders.userId],
-    references: [users.id],
-  }),
-  items: many(orderItems),
-  delivery: one(deliveries),
-}));
-
-export const orderItemsRelations = relations(orderItems, ({ one }) => ({
-  order: one(orders, {
-    fields: [orderItems.orderId],
-    references: [orders.id],
-  }),
-  product: one(products, {
-    fields: [orderItems.productId],
-    references: [products.prodId],
-  }),
 }));
 
 export const cartsRelations = relations(carts, ({ one, many }) => ({
@@ -265,7 +232,27 @@ export const cartItemsRelations = relations(cartItems, ({ one }) => ({
   }),
   product: one(products, {
     fields: [cartItems.productId],
-    references: [products.prodId],
+    references: [products.id],
+  }),
+}));
+
+export const ordersRelations = relations(orders, ({ one, many }) => ({
+  user: one(users, {
+    fields: [orders.userId],
+    references: [users.id],
+  }),
+  items: many(orderItems),
+  delivery: many(deliveries),
+}));
+
+export const orderItemsRelations = relations(orderItems, ({ one }) => ({
+  order: one(orders, {
+    fields: [orderItems.orderId],
+    references: [orders.id],
+  }),
+  product: one(products, {
+    fields: [orderItems.productId],
+    references: [products.id],
   }),
 }));
 
@@ -279,14 +266,7 @@ export const deliveriesRelations = relations(deliveries, ({ one }) => ({
 export const inventoryRelations = relations(inventory, ({ one }) => ({
   product: one(products, {
     fields: [inventory.productId],
-    references: [products.prodId],
-  }),
-}));
-
-export const inquiriesRelations = relations(inquiries, ({ one }) => ({
-  product: one(products, {
-    fields: [inquiries.productId],
-    references: [products.prodId],
+    references: [products.id],
   }),
 }));
 
@@ -297,69 +277,28 @@ export const customDesignRequestsRelations = relations(customDesignRequests, ({ 
   }),
 }));
 
-// Insert schemas
-export const insertUserSchema = createInsertSchema(users).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-  refreshToken: true,
-  role: true,
-});
-
-export const insertProductSchema = createInsertSchema(products).omit({
-  prodId: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertCartItemSchema = createInsertSchema(cartItems).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertOrderSchema = createInsertSchema(orders).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertInquirySchema = createInsertSchema(inquiries).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertCustomDesignRequestSchema = createInsertSchema(customDesignRequests).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
+// Schema validation
+export const insertUserSchema = createInsertSchema(users);
+export const insertProductSchema = createInsertSchema(products);
+export const insertCartSchema = createInsertSchema(carts);
+export const insertCartItemSchema = createInsertSchema(cartItems);
+export const insertOrderSchema = createInsertSchema(orders);
+export const insertOrderItemSchema = createInsertSchema(orderItems);
+export const insertDeliverySchema = createInsertSchema(deliveries);
+export const insertInventorySchema = createInsertSchema(inventory);
+export const insertSupplierSchema = createInsertSchema(suppliers);
+export const insertInquirySchema = createInsertSchema(inquiries);
+export const insertCustomDesignRequestSchema = createInsertSchema(customDesignRequests);
 
 // Types
 export type User = typeof users.$inferSelect;
-export type InsertUser = z.infer<typeof insertUserSchema>;
-
 export type Product = typeof products.$inferSelect;
-export type InsertProduct = z.infer<typeof insertProductSchema>;
-
-export type CartItem = typeof cartItems.$inferSelect;
-export type InsertCartItem = z.infer<typeof insertCartItemSchema>;
-
-export type Order = typeof orders.$inferSelect;
-export type InsertOrder = z.infer<typeof insertOrderSchema>;
-
-export type OrderItem = typeof orderItems.$inferSelect;
 export type Cart = typeof carts.$inferSelect;
-
-export type Inquiry = typeof inquiries.$inferSelect;
-export type InsertInquiry = z.infer<typeof insertInquirySchema>;
-
-export type CustomDesignRequest = typeof customDesignRequests.$inferSelect;
-export type InsertCustomDesignRequest = z.infer<typeof insertCustomDesignRequestSchema>;
-
+export type CartItem = typeof cartItems.$inferSelect;
+export type Order = typeof orders.$inferSelect;
+export type OrderItem = typeof orderItems.$inferSelect;
 export type Delivery = typeof deliveries.$inferSelect;
 export type Inventory = typeof inventory.$inferSelect;
 export type Supplier = typeof suppliers.$inferSelect;
-
-
+export type Inquiry = typeof inquiries.$inferSelect;
+export type CustomDesignRequest = typeof customDesignRequests.$inferSelect;

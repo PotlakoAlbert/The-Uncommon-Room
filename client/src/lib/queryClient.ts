@@ -1,4 +1,5 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { store } from "../store/store";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -11,13 +12,37 @@ export async function apiRequest(
   method: string,
   url: string,
   data?: unknown | undefined,
+  options?: { 
+    throwOn401?: boolean; // Allow some requests to not throw on 401
+  }
 ): Promise<Response> {
+  // Get the current token from the Redux store
+  const state = store.getState();
+  const token = state.auth.token;
+  
+  const headers: Record<string, string> = {};
+  
+  // Add Content-Type for requests with data
+  if (data) {
+    headers["Content-Type"] = "application/json";
+  }
+  
+  // Add Authorization header if token exists
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
   const res = await fetch(url, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    headers,
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
+
+  // Don't throw on 401 if explicitly requested (useful for cart requests)
+  if (res.status === 401 && options?.throwOn401 === false) {
+    return res;
+  }
 
   await throwIfResNotOk(res);
   return res;
@@ -29,7 +54,19 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
+    // Get the current token from the Redux store
+    const state = store.getState();
+    const token = state.auth.token;
+    
+    const headers: Record<string, string> = {};
+    
+    // Add Authorization header if token exists
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
     const res = await fetch(queryKey.join("/") as string, {
+      headers,
       credentials: "include",
     });
 

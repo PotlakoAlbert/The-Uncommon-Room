@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import bcrypt from "bcrypt";
@@ -9,71 +9,37 @@ import rateLimit from "express-rate-limit";
 import multer from "multer";
 import { v2 as cloudinary } from "cloudinary";
 import nodemailer from "nodemailer";
+
+// Multer configuration for in-memory storage
+const upload = multer({ storage: multer.memoryStorage() });
 import swaggerJsdoc from "swagger-jsdoc";
 import swaggerUi from "swagger-ui-express";
+import cookieParser from "cookie-parser";
+import authRoutes from "./routes/auth";
+import cartRoutes from "./routes/cart";
 
-// Configure Cloudinary
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || "demo",
-  api_key: process.env.CLOUDINARY_API_KEY || "demo",
-  api_secret: process.env.CLOUDINARY_API_SECRET || "demo",
-});
-
-// Configure Nodemailer
+// Nodemailer transporter configuration
 const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || "smtp.gmail.com",
+  host: process.env.SMTP_HOST || "smtp.example.com",
   port: parseInt(process.env.SMTP_PORT || "587"),
-  secure: false,
+  secure: false, // true for 465, false for other ports
   auth: {
-    user: process.env.SMTP_USER || "",
-    pass: process.env.SMTP_PASS || "",
+    user: process.env.SMTP_USER || "your_smtp_user",
+    pass: process.env.SMTP_PASS || "your_smtp_password",
   },
 });
 
-// Multer configuration for file uploads
-const upload = multer({ 
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
-});
+import { authenticateToken, requireAdmin, AuthRequest } from './middleware/auth';
 
-// JWT secret
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
-
-// Rate limiting  
+// Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
-  trustProxy: true, // Trust proxy headers in development
+  max: 100, // Limit each IP to 100 requests per windowMs
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 
-// Auth middleware
-interface AuthRequest extends Express.Request {
-  user?: { id: number; type: 'customer' | 'admin' };
-}
-
-const authenticateToken = async (req: AuthRequest, res: any, next: any) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-
-  if (!token) {
-    return res.status(401).json({ message: 'Access token required' });
-  }
-
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
-    req.user = decoded;
-    next();
-  } catch (error) {
-    return res.status(403).json({ message: 'Invalid token' });
-  }
-};
-
-const requireAdmin = (req: AuthRequest, res: any, next: any) => {
-  if (req.user?.type !== 'admin') {
-    return res.status(403).json({ message: 'Admin access required' });
-  }
-  next();
-};
+// (Removed duplicate registerRoutes implementation)
 
 // Swagger configuration
 const swaggerOptions = {
@@ -112,15 +78,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
    * @swagger
    * components:
    *   schemas:
-   *     Customer:
+   *     User:
    *       type: object
    *       properties:
-   *         customerId:
+   *         id:
    *           type: integer
    *         name:
    *           type: string
    *         email:
    *           type: string
+   *         role:
+   *           type: string
+   *           enum: [user, admin]
    *         phone:
    *           type: string
    *         address:
@@ -133,7 +102,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
    * @swagger
    * /auth/register:
    *   post:
-   *     summary: Register a new customer
+   *     summary: Register a new user
    *     tags: [Authentication]
    *     requestBody:
    *       required: true
@@ -158,7 +127,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
    *                 type: string
    *     responses:
    *       201:
-   *         description: Customer registered successfully
+   *         description: User registered successfully
    *       400:
    *         description: Registration failed
    */
@@ -166,42 +135,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { name, email, password, phone, address } = req.body;
 
-      // Check if customer already exists
-      const existingCustomer = await storage.getCustomerByEmail(email);
-      if (existingCustomer) {
+      // Check if user already exists
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
         return res.status(400).json({ message: 'Email already registered' });
       }
 
       // Hash password
       const passwordHash = await bcrypt.hash(password, 12);
 
-      // Create customer
-      const customer = await storage.createCustomer({
+      // Create user
+      const user = await storage.createUser({
         name,
         email,
-        passwordHash,
+        passwordHash: passwordHash,
         phone,
         address,
       });
 
       // Create shopping cart
-      await storage.createCart(customer.customerId);
+      await storage.createCart(user.id);
 
       // Generate JWT token
+      if (!process.env.JWT_SECRET) {
+        throw new Error("JWT_SECRET environment variable is not set");
+      }
       const token = jwt.sign(
-        { id: customer.customerId, type: 'customer' },
-        JWT_SECRET,
+        { id: user.id, type: 'user' },
+        process.env.JWT_SECRET,
         { expiresIn: '7d' }
       );
 
       res.status(201).json({
         message: 'Registration successful',
         token,
-        customer: { ...customer, passwordHash: undefined },
+        user: { ...user, passwordHash: undefined },
+        customer: { ...user, passwordHash: undefined },
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Registration error:', error);
-      res.status(500).json({ message: 'Registration failed' });
+      let errorMessage = 'Registration failed';
+      
+      if (error.code === '22001') {
+        errorMessage = 'One of the fields is too long. Please check your input.';
+      } else if (error.code === '23505') {
+        errorMessage = 'Email already registered';
+      }
+      
+      res.status(500).json({ message: errorMessage });
     }
   });
 
@@ -236,28 +217,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { email, password } = req.body;
 
       // Find customer
-      const customer = await storage.getCustomerByEmail(email);
-      if (!customer) {
-        return res.status(401).json({ message: 'Invalid credentials' });
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        return res.status(401).json({ message: 'No account found for this email. Please register.' });
       }
 
       // Verify password
-      const validPassword = await bcrypt.compare(password, customer.passwordHash);
+      const validPassword = await bcrypt.compare(password, user.passwordHash);
       if (!validPassword) {
         return res.status(401).json({ message: 'Invalid credentials' });
       }
 
       // Generate JWT token
+      if (!process.env.JWT_SECRET) {
+        throw new Error("JWT_SECRET environment variable is not set");
+      }
       const token = jwt.sign(
-        { id: customer.customerId, type: 'customer' },
-        JWT_SECRET,
+        { id: user.id, type: 'user' },
+        process.env.JWT_SECRET,
         { expiresIn: '7d' }
       );
 
       res.json({
         message: 'Login successful',
         token,
-        customer: { ...customer, passwordHash: undefined },
+        user: { ...user, passwordHash: undefined },
+        customer: { ...user, passwordHash: undefined },
       });
     } catch (error) {
       console.error('Login error:', error);
@@ -283,9 +268,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Generate JWT token
+      if (!process.env.JWT_SECRET) {
+        throw new Error("JWT_SECRET environment variable is not set");
+      }
+
       const token = jwt.sign(
-        { id: admin.adminId, type: 'admin' },
-        JWT_SECRET,
+        { id: admin.adminId, email: admin.email, role: 'admin' },
+        process.env.JWT_SECRET,
         { expiresIn: '7d' }
       );
 
@@ -394,14 +383,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Shopping cart routes
   app.get('/api/cart', authenticateToken, async (req: AuthRequest, res) => {
     try {
-      const customerId = req.user!.id;
-      let cart = await storage.getCustomerCart(customerId);
+      const userId = req.user!.id;
+      let cart = await storage.getCart(userId);
       
       if (!cart) {
-        cart = await storage.createCart(customerId);
+        cart = await storage.createCart(userId);
       }
 
-      const cartItems = await storage.getCartItems(cart.cartId);
+      const cartItems = await storage.getCartItems(cart.id);
       res.json({ cart, items: cartItems });
     } catch (error) {
       console.error('Get cart error:', error);
@@ -411,16 +400,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/cart/items', authenticateToken, async (req: AuthRequest, res) => {
     try {
-      const customerId = req.user!.id;
-      const { prodId, quantity, customNotes } = req.body;
+      const userId = req.user!.id;
+      const { productId, quantity, customNotes } = req.body;
 
-      let cart = await storage.getCustomerCart(customerId);
+      let cart = await storage.getCart(userId);
       if (!cart) {
-        cart = await storage.createCart(customerId);
+        cart = await storage.createCart(userId);
       }
 
-      const cartItem = await storage.addToCart(cart.cartId, {
-        prodId,
+      const cartItem = await storage.addToCart(cart.id, {
+        productId,
         quantity: quantity || 1,
         customNotes,
       });
@@ -464,16 +453,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Order routes
   app.post('/api/orders', authenticateToken, async (req: AuthRequest, res) => {
     try {
-      const customerId = req.user!.id;
+      const userId = req.user!.id;
       const { totalAmount, shippingAddress, paymentMethod } = req.body;
 
       // Get cart items
-      const cart = await storage.getCustomerCart(customerId);
+      const cart = await storage.getCart(userId);
       if (!cart) {
         return res.status(400).json({ message: 'No cart found' });
       }
 
-      const cartItems = await storage.getCartItems(cart.cartId);
+      const cartItems = await storage.getCartItems(cart.id);
       if (cartItems.length === 0) {
         return res.status(400).json({ message: 'Cart is empty' });
       }
@@ -481,7 +470,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create order
       const order = await storage.createOrder(
         {
-          customerId,
+          userId,
           totalAmount,
           shippingAddress,
           paymentMethod,
@@ -489,24 +478,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
           paymentStatus: 'pending',
         },
         cartItems.map(item => ({
-          prodId: item.cart_items.prodId!,
-          quantity: item.cart_items.quantity,
-          unitPrice: item.products.price,
+          productId: item.productId!,
+          quantity: item.quantity,
+          unitPrice: item.product.price,
         }))
       );
 
       // Clear cart
-      await storage.clearCart(cart.cartId);
+      await storage.clearCart(cart.id);
 
       // Send confirmation email
       try {
         await transporter.sendMail({
           from: process.env.SMTP_FROM || 'noreply@theuncommonroom.co.za',
-          to: (await storage.getCustomer(customerId))?.email,
+          to: (await storage.getUser(userId))?.email,
           subject: 'Order Confirmation - The Uncommon Room',
           html: `
             <h1>Thank you for your order!</h1>
-            <p>Your order #UCR-${order.ordId} has been placed successfully.</p>
+            <p>Your order #UCR-${order.id} has been placed successfully.</p>
             <p>Total Amount: R ${totalAmount}</p>
             <p>We'll update you on the progress of your order.</p>
           `,
@@ -524,8 +513,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/orders', authenticateToken, async (req: AuthRequest, res) => {
     try {
-      const customerId = req.user!.id;
-      const orders = await storage.getCustomerOrders(customerId);
+      const userId = req.user!.id;
+      const orders = await storage.getUserOrders(userId);
       res.json(orders);
     } catch (error) {
       console.error('Get orders error:', error);
@@ -542,8 +531,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Order not found' });
       }
 
-      // Check if order belongs to customer (unless admin)
-      if (req.user!.type === 'customer' && order.customerId !== req.user!.id) {
+      // Check if order belongs to user (unless admin)
+      if (req.user!.role !== 'admin' && order.userId !== req.user!.id) {
         return res.status(403).json({ message: 'Access denied' });
       }
 
@@ -614,7 +603,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const request = await storage.createCustomDesignRequest({
-        customerId,
+        userId: customerId,
         furnitureType: req.body.furnitureType,
         dimensions: req.body.dimensions,
         materialPreference: req.body.materialPreference,
@@ -685,7 +674,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/admin/customers', authenticateToken, requireAdmin, async (req, res) => {
     try {
-      const customers = await storage.getAllCustomers();
+      const customers = await storage.getAllUsers();
       res.json(customers);
     } catch (error) {
       console.error('Get customers error:', error);

@@ -4,8 +4,10 @@ import { useLocation } from "wouter";
 import { RootState } from "@/store/store";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { apiRequest } from "@/lib/queryClient";
 import { useState } from "react";
 
 export default function AdminCustomers() {
@@ -16,13 +18,20 @@ export default function AdminCustomers() {
 
   const { data: customers, isLoading } = useQuery({
     queryKey: ['/api/admin/customers'],
-    enabled: isAuthenticated && user?.type === 'admin',
+    enabled: isAuthenticated && user?.role === 'admin',
     queryFn: async () => {
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/admin/customers', {
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
+      const response = await apiRequest('GET', '/api/admin/customers');
       if (!response.ok) throw new Error('Failed to fetch customers');
+      return response.json();
+    },
+  });
+
+  const { data: customerStats, isLoading: statsLoading } = useQuery({
+    queryKey: ['/api/admin/customers/stats'],
+    enabled: isAuthenticated && user?.role === 'admin',
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/admin/customers/stats');
+      if (!response.ok) throw new Error('Failed to fetch customer stats');
       return response.json();
     },
   });
@@ -31,10 +40,7 @@ export default function AdminCustomers() {
     queryKey: ['/api/customers', selectedCustomer?.customerId, 'orders'],
     enabled: !!selectedCustomer?.customerId,
     queryFn: async () => {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`/api/customers/${selectedCustomer.customerId}/orders`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
+      const response = await apiRequest('GET', `/api/customers/${selectedCustomer.customerId}/orders`);
       if (!response.ok) throw new Error('Failed to fetch customer orders');
       return response.json();
     },
@@ -45,7 +51,7 @@ export default function AdminCustomers() {
     setIsDetailsDialogOpen(true);
   };
 
-  if (!isAuthenticated || user?.type !== 'admin') {
+  if (!isAuthenticated || user?.role !== 'admin') {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">

@@ -69,7 +69,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     contentSecurityPolicy: false, // Disable CSP for development
     crossOriginEmbedderPolicy: false,
   }));
-  app.use(limiter);
+  // app.use(limiter); // Temporarily disabled for debugging
 
   // Swagger documentation
   app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(specs));
@@ -265,6 +265,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validPassword = await bcrypt.compare(password, admin.passwordHash);
       if (!validPassword) {
         return res.status(401).json({ message: 'Invalid credentials' });
+      }
+
+      // Check if there's already a user record for this admin
+      let userRecord = await storage.getUserByEmail(email);
+      
+      // If no user record exists, create one
+      if (!userRecord) {
+        userRecord = await storage.createUser({
+          name: admin.name,
+          email: admin.email,
+          passwordHash: admin.passwordHash, // Use the same password hash
+          role: 'admin',
+          phone: admin.phone,
+          address: admin.address,
+          adminId: admin.adminId
+        });
       }
 
       // Generate JWT token
@@ -702,6 +718,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin products GET route
+  app.get('/api/admin/products', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+      const filters = {
+        category: req.query.category as string,
+        minPrice: req.query.minPrice ? parseFloat(req.query.minPrice as string) : undefined,
+        maxPrice: req.query.maxPrice ? parseFloat(req.query.maxPrice as string) : undefined,
+        material: req.query.material as string,
+        search: req.query.search as string,
+      };
+
+      // For admin, get all products (including inactive ones)
+      const products = await storage.getAllProductsForAdmin(filters);
+      res.json(products);
+    } catch (error) {
+      console.error('Get admin products error:', error);
+      res.status(500).json({ message: 'Failed to fetch products' });
+    }
+  });
+
   app.post('/api/admin/products', upload.array('images', 10), authenticateToken, requireAdmin, async (req, res) => {
     try {
       const files = req.files as Express.Multer.File[];
@@ -760,6 +796,126 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Get inventory error:', error);
       res.status(500).json({ message: 'Failed to fetch inventory' });
+    }
+  });
+
+  // Reports API
+  app.get('/api/admin/reports', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+      const { type, range, startDate, endDate } = req.query;
+      
+      let reportData;
+      let dateFilter = { startDate: undefined as string | undefined, endDate: undefined as string | undefined };
+
+      // Calculate date range
+      if (range === 'custom' && startDate && endDate) {
+        dateFilter.startDate = startDate as string;
+        dateFilter.endDate = endDate as string;
+      } else if (range && range !== 'custom') {
+        const now = new Date();
+        const days = range === '7d' ? 7 : range === '30d' ? 30 : range === '90d' ? 90 : 365;
+        const start = new Date(now.getTime() - (days * 24 * 60 * 60 * 1000));
+        dateFilter.startDate = start.toISOString().split('T')[0];
+        dateFilter.endDate = now.toISOString().split('T')[0];
+      }
+
+      switch (type) {
+        case 'sales':
+          reportData = await storage.generateSalesReport(dateFilter.startDate, dateFilter.endDate);
+          break;
+        case 'inventory':
+          reportData = await storage.generateInventoryReport();
+          break;
+        case 'customers':
+          reportData = await storage.generateCustomerReport(dateFilter.startDate, dateFilter.endDate);
+          break;
+        case 'products':
+          reportData = await storage.generateProductReport(dateFilter.startDate, dateFilter.endDate);
+          break;
+        case 'custom_designs':
+          reportData = await storage.generateCustomDesignReport(dateFilter.startDate, dateFilter.endDate);
+          break;
+        default:
+          return res.status(400).json({ message: 'Invalid report type' });
+      }
+
+      // Add general stats to all reports
+      const dashboardStats = await storage.getDashboardStats();
+      reportData = {
+        ...reportData,
+        totalCustomers: dashboardStats.totalUsers,
+        totalProducts: dashboardStats.totalProducts,
+      };
+
+      console.log('Sending report data:', JSON.stringify(reportData, null, 2));
+      res.json(reportData);
+    } catch (error) {
+      console.error('Generate report error:', error);
+      res.status(500).json({ message: 'Failed to generate report' });
+    }
+  });
+
+  app.get('/api/admin/reports/export', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+      const { type, range, startDate, endDate, format } = req.query;
+      
+      // For now, return JSON data. In a real implementation, you would generate PDF/CSV/Excel files
+      let reportData;
+      let dateFilter = { startDate: undefined as string | undefined, endDate: undefined as string | undefined };
+
+      if (range === 'custom' && startDate && endDate) {
+        dateFilter.startDate = startDate as string;
+        dateFilter.endDate = endDate as string;
+      } else if (range && range !== 'custom') {
+        const now = new Date();
+        const days = range === '7d' ? 7 : range === '30d' ? 30 : range === '90d' ? 90 : 365;
+        const start = new Date(now.getTime() - (days * 24 * 60 * 60 * 1000));
+        dateFilter.startDate = start.toISOString().split('T')[0];
+        dateFilter.endDate = now.toISOString().split('T')[0];
+      }
+
+      switch (type) {
+        case 'sales':
+          reportData = await storage.generateSalesReport(dateFilter.startDate, dateFilter.endDate);
+          break;
+        case 'inventory':
+          reportData = await storage.generateInventoryReport();
+          break;
+        case 'customers':
+          reportData = await storage.generateCustomerReport(dateFilter.startDate, dateFilter.endDate);
+          break;
+        case 'products':
+          reportData = await storage.generateProductReport(dateFilter.startDate, dateFilter.endDate);
+          break;
+        case 'custom_designs':
+          reportData = await storage.generateCustomDesignReport(dateFilter.startDate, dateFilter.endDate);
+          break;
+        default:
+          return res.status(400).json({ message: 'Invalid report type' });
+      }
+
+      // Set appropriate headers based on format
+      if (format === 'pdf') {
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${type}-report.pdf"`);
+      } else if (format === 'csv') {
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename="${type}-report.csv"`);
+      } else if (format === 'excel') {
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${type}-report.xlsx"`);
+      } else {
+        res.setHeader('Content-Type', 'application/json');
+      }
+
+      // For now, return JSON. In production, you would use libraries like:
+      // - PDF: puppeteer, jsPDF, or PDFKit
+      // - CSV: csv-writer or fast-csv
+      // - Excel: exceljs or xlsx
+      res.json(reportData);
+    } catch (error) {
+      console.error('Export report error:', error);
+      res.status(500).json({ message: 'Failed to export report' });
     }
   });
 

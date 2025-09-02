@@ -6,6 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { loginSuccess } from "@/store/authSlice";
+import { syncCartOnLogin } from "@/store/cartSlice";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,9 +41,11 @@ export default function AdminLogin() {
     },
     onSuccess: (data) => {
       dispatch(loginSuccess({
-        user: { ...data.admin, type: 'admin' },
+        user: { ...data.admin, role: 'admin' },
         token: data.token,
       }));
+      // Sync cart after successful login
+      dispatch(syncCartOnLogin());
       toast({
         title: "Admin Login Successful",
         description: "Welcome to the admin panel!",

@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 
 const updateStockSchema = z.object({
   quantity: z.string().min(1, "Quantity is required").transform(Number),
@@ -38,40 +39,28 @@ export default function AdminInventory() {
 
   const { data: inventory, isLoading } = useQuery({
     queryKey: ['/api/admin/inventory'],
-    enabled: isAuthenticated && user?.type === 'admin',
+    enabled: isAuthenticated && user?.role === 'admin',
     queryFn: async () => {
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/admin/inventory', {
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
+      const response = await apiRequest('GET', '/api/admin/inventory');
       if (!response.ok) throw new Error('Failed to fetch inventory');
       return response.json();
     },
   });
 
-  const updateStockMutation = useMutation({
+  const updateInventoryMutation = useMutation({
     mutationFn: async ({ prodId, quantity }: { prodId: number; quantity: number }) => {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`/api/admin/inventory/${prodId}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ quantity }),
-      });
+      const response = await apiRequest('PUT', `/api/admin/inventory/${prodId}`, { quantity });
       if (!response.ok) throw new Error('Failed to update inventory');
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/inventory'] });
-      form.reset();
-      setIsUpdateDialogOpen(false);
-      setSelectedProduct(null);
       toast({
         title: "Inventory Updated",
-        description: "Stock quantity has been updated successfully.",
+        description: "The inventory has been updated successfully.",
       });
+      setIsUpdateDialogOpen(false);
+      setSelectedProduct(null);
     },
     onError: (error: any) => {
       toast({
@@ -90,7 +79,7 @@ export default function AdminInventory() {
 
   const onSubmit = (data: UpdateStockFormData) => {
     if (!selectedProduct) return;
-    updateStockMutation.mutate({
+    updateInventoryMutation.mutate({
       prodId: selectedProduct.products.prodId,
       quantity: data.quantity,
     });
@@ -103,7 +92,7 @@ export default function AdminInventory() {
     return { label: 'In Stock', color: 'bg-green-100 text-green-800' };
   };
 
-  if (!isAuthenticated || user?.type !== 'admin') {
+  if (!isAuthenticated || user?.role !== 'admin') {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -394,10 +383,10 @@ export default function AdminInventory() {
                     <Button
                       type="submit"
                       className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90"
-                      disabled={updateStockMutation.isPending}
+                      disabled={updateInventoryMutation.isPending}
                       data-testid="button-save-stock"
                     >
-                      {updateStockMutation.isPending ? (
+                      {updateInventoryMutation.isPending ? (
                         <>
                           <span className="material-icons animate-spin mr-2">hourglass_empty</span>
                           Updating...

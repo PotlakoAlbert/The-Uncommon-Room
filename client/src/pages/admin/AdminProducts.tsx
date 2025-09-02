@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 
 const productSchema = z.object({
   name: z.string().min(1, "Product name is required"),
@@ -49,8 +50,13 @@ export default function AdminProducts() {
   });
 
   const { data: products, isLoading } = useQuery({
-    queryKey: ['/api/products'],
-    enabled: isAuthenticated && user?.type === 'admin',
+    queryKey: ['/api/admin/products'],
+    enabled: isAuthenticated && user?.role === 'admin',
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/admin/products');
+      if (!response.ok) throw new Error('Failed to fetch products');
+      return response.json();
+    },
   });
 
   const createProductMutation = useMutation({
@@ -68,17 +74,13 @@ export default function AdminProducts() {
         });
       }
 
-      const response = await fetch('/api/admin/products', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
-        body: formData,
-      });
+      const response = await apiRequest('POST', '/api/admin/products', formData);
 
       if (!response.ok) throw new Error('Failed to create product');
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/products'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/products'] });
       form.reset();
       setSelectedFiles(null);
       setIsAddDialogOpen(false);
@@ -98,16 +100,12 @@ export default function AdminProducts() {
 
   const deleteProductMutation = useMutation({
     mutationFn: async (productId: number) => {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`/api/admin/products/${productId}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
+      const response = await apiRequest('DELETE', `/api/admin/products/${productId}`);
       if (!response.ok) throw new Error('Failed to delete product');
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/products'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/products'] });
       toast({
         title: "Product Deleted",
         description: "The product has been removed successfully.",
@@ -136,7 +134,7 @@ export default function AdminProducts() {
     }
   };
 
-  if (!isAuthenticated || user?.type !== 'admin') {
+  if (!isAuthenticated || user?.role !== 'admin') {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">

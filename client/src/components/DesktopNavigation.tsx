@@ -60,6 +60,13 @@ export default function DesktopNavigation({ isAdminRoute }: DesktopNavigationPro
                   >
                     Inquiries
                   </Link>
+                  <Link
+                    href="/admin/reports"
+                    className={`${location === '/admin/reports' ? 'text-primary' : 'text-muted-foreground'} hover:text-primary transition-colors`}
+                    data-testid="link-admin-reports"
+                  >
+                    Reports
+                  </Link>
                 </nav>
               </div>
               <div className="flex items-center space-x-4">

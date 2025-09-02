@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 
 const updateDesignSchema = z.object({
   status: z.enum(["submitted", "under_review", "quoted", "approved", "rejected"]),
@@ -51,38 +52,25 @@ export default function AdminCustomDesigns() {
 
   const { data: customDesigns, isLoading } = useQuery({
     queryKey: ['/api/admin/custom-designs'],
-    enabled: isAuthenticated && user?.type === 'admin',
+    enabled: isAuthenticated && user?.role === 'admin',
     queryFn: async () => {
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/admin/custom-designs', {
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
+      const response = await apiRequest('GET', '/api/admin/custom-designs');
       if (!response.ok) throw new Error('Failed to fetch custom designs');
       return response.json();
     },
   });
 
-  const updateDesignMutation = useMutation({
-    mutationFn: async ({ designId, status, quoteAmount }: { designId: number; status: string; quoteAmount?: string }) => {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`/api/admin/custom-designs/${designId}/status`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ status, quoteAmount }),
-      });
+  const updateDesignStatusMutation = useMutation({
+    mutationFn: async ({ designId, status }: { designId: number; status: string }) => {
+      const response = await apiRequest('PUT', `/api/admin/custom-designs/${designId}/status`, { status });
       if (!response.ok) throw new Error('Failed to update design status');
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/custom-designs'] });
-      form.reset();
-      setIsUpdateDialogOpen(false);
       toast({
         title: "Design Status Updated",
-        description: "The custom design status has been updated successfully.",
+        description: "The design status has been updated successfully.",
       });
     },
     onError: (error: any) => {
@@ -118,14 +106,13 @@ export default function AdminCustomDesigns() {
 
   const onSubmit = (data: UpdateDesignFormData) => {
     if (!selectedDesign) return;
-    updateDesignMutation.mutate({
+    updateDesignStatusMutation.mutate({
       designId: selectedDesign.custom_design_requests.designId,
       status: data.status,
-      quoteAmount: data.quoteAmount,
     });
   };
 
-  if (!isAuthenticated || user?.type !== 'admin') {
+  if (!isAuthenticated || user?.role !== 'admin') {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -518,10 +505,10 @@ export default function AdminCustomDesigns() {
                     <Button
                       type="submit"
                       className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90"
-                      disabled={updateDesignMutation.isPending}
+                      disabled={updateDesignStatusMutation.isPending}
                       data-testid="button-save-design-status"
                     >
-                      {updateDesignMutation.isPending ? (
+                      {updateDesignStatusMutation.isPending ? (
                         <>
                           <span className="material-icons animate-spin mr-2">hourglass_empty</span>
                           Updating...

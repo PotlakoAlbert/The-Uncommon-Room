@@ -17,6 +17,26 @@ async function seed() {
         address: "Cape Town, South Africa",
       }).returning();
       console.log("✅ Admin user created:", admin.email);
+      
+      // Also create corresponding user record
+      try {
+        await db.insert(users).values({
+          name: admin.name,
+          email: admin.email,
+          passwordHash: admin.passwordHash,
+          role: 'admin',
+          phone: admin.phone,
+          address: admin.address,
+          adminId: admin.adminId
+        });
+        console.log("✅ Admin user record created in users table");
+      } catch (userError: any) {
+        if (userError.code === '23505') {
+          console.log("ℹ️ Admin user record already exists in users table");
+        } else {
+          console.error("Failed to create admin user record:", userError);
+        }
+      }
     } catch (error: any) {
       if (error.code === '23505') {
         console.log("ℹ️ Admin user already exists, skipping...");

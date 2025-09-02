@@ -1,8 +1,8 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { db } from "../db";
-import { users } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { users, admins } from "@shared/schema";
+import { eq, or } from "drizzle-orm";
 
 export interface AuthRequest extends Request {
   user?: {
@@ -50,19 +50,48 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
       role: string;
     };
 
-    const user = await db.query.users.findFirst({
-      where: eq(users.id, decoded.id)
-    });
+    // Check if it's an admin token (adminId in JWT) or user token (id in JWT)
+    let user = null;
+    let role = decoded.role;
+
+    if (decoded.role === 'admin') {
+      // For admin tokens, check the admins table
+      const admin = await db.query.admins.findFirst({
+        where: eq(admins.adminId, decoded.id)
+      });
+      
+      if (admin) {
+        // Also check if there's a corresponding user record
+        const userRecord = await db.query.users.findFirst({
+          where: eq(users.adminId, admin.adminId)
+        });
+        
+        user = {
+          id: userRecord?.id || admin.adminId, // Use user ID if exists, otherwise admin ID
+          email: admin.email,
+          role: 'admin'
+        };
+      }
+    } else {
+      // For regular user tokens, check the users table
+      const userRecord = await db.query.users.findFirst({
+        where: eq(users.id, decoded.id)
+      });
+      
+      if (userRecord) {
+        user = {
+          id: userRecord.id,
+          email: userRecord.email,
+          role: userRecord.role
+        };
+      }
+    }
 
     if (!user) {
       return res.status(401).json({ message: "User not found" });
     }
 
-    req.user = {
-      id: user.id,
-      email: user.email,
-      role: user.role
-    };
+    req.user = user;
     next();
   } catch (error) {
     if (error instanceof jwt.JsonWebTokenError) {

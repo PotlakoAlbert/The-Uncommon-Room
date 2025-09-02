@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 
 const orderStatuses = [
   { value: 'pending', label: 'Pending', color: 'bg-yellow-100 text-yellow-800' },
@@ -30,12 +31,9 @@ export default function AdminOrders() {
 
   const { data: orders, isLoading } = useQuery({
     queryKey: ['/api/admin/orders'],
-    enabled: isAuthenticated && user?.type === 'admin',
+    enabled: isAuthenticated && user?.role === 'admin',
     queryFn: async () => {
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/admin/orders', {
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
+      const response = await apiRequest('GET', '/api/admin/orders');
       if (!response.ok) throw new Error('Failed to fetch orders');
       return response.json();
     },
@@ -43,15 +41,7 @@ export default function AdminOrders() {
 
   const updateOrderStatusMutation = useMutation({
     mutationFn: async ({ orderId, status }: { orderId: number; status: string }) => {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`/api/admin/orders/${orderId}/status`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ status }),
-      });
+      const response = await apiRequest('PUT', `/api/admin/orders/${orderId}/status`, { status });
       if (!response.ok) throw new Error('Failed to update order status');
       return response.json();
     },
@@ -75,10 +65,7 @@ export default function AdminOrders() {
     queryKey: ['/api/orders', selectedOrder?.orders?.ordId],
     enabled: !!selectedOrder?.orders?.ordId,
     queryFn: async () => {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`/api/orders/${selectedOrder.orders.ordId}`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
+      const response = await apiRequest('GET', `/api/orders/${selectedOrder.orders.ordId}`);
       if (!response.ok) throw new Error('Failed to fetch order details');
       return response.json();
     },
@@ -103,7 +90,7 @@ export default function AdminOrders() {
     setIsDetailsDialogOpen(true);
   };
 
-  if (!isAuthenticated || user?.type !== 'admin') {
+  if (!isAuthenticated || user?.role !== 'admin') {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">

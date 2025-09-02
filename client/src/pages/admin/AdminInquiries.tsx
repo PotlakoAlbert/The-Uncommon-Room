@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 
 const inquiryStatuses = [
   { value: 'new', label: 'New', color: 'bg-blue-100 text-blue-800' },
@@ -34,12 +35,9 @@ export default function AdminInquiries() {
 
   const { data: inquiries, isLoading } = useQuery({
     queryKey: ['/api/admin/inquiries'],
-    enabled: isAuthenticated && user?.type === 'admin',
+    enabled: isAuthenticated && user?.role === 'admin',
     queryFn: async () => {
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/admin/inquiries', {
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
+      const response = await apiRequest('GET', '/api/admin/inquiries');
       if (!response.ok) throw new Error('Failed to fetch inquiries');
       return response.json();
     },
@@ -47,15 +45,7 @@ export default function AdminInquiries() {
 
   const updateInquiryStatusMutation = useMutation({
     mutationFn: async ({ inquiryId, status }: { inquiryId: number; status: string }) => {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`/api/admin/inquiries/${inquiryId}/status`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ status }),
-      });
+      const response = await apiRequest('PUT', `/api/admin/inquiries/${inquiryId}/status`, { status });
       if (!response.ok) throw new Error('Failed to update inquiry status');
       return response.json();
     },
@@ -114,7 +104,7 @@ export default function AdminInquiries() {
     setIsDetailsDialogOpen(true);
   };
 
-  if (!isAuthenticated || user?.type !== 'admin') {
+  if (!isAuthenticated || user?.role !== 'admin') {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">

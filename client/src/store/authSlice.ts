@@ -1,7 +1,7 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import axios from 'axios';
 import { store } from './store';
-import { syncCartOnLogin, clearCart } from './cartSlice';
+import { syncCartOnLogin } from './cartSlice';
 
 interface User {
   id: number;
@@ -124,9 +124,6 @@ const authSlice = createSlice({
       state.isAuthenticated = true;
       localStorage.setItem('token', action.payload.token);
       localStorage.setItem('user', JSON.stringify(action.payload.user));
-      
-      // Sync cart after login
-      store.dispatch(syncCartOnLogin());
     },
     updateProfile: (state, action: PayloadAction<Partial<User>>) => {
       if (state.user) {
@@ -147,9 +144,6 @@ const authSlice = createSlice({
         state.token = action.payload.accessToken;
         state.isAuthenticated = true;
         localStorage.setItem('token', action.payload.accessToken);
-        
-        // Sync cart after registration
-        store.dispatch(syncCartOnLogin());
       })
       .addCase(register.rejected, (state, action) => {
         state.isLoading = false;
@@ -166,9 +160,6 @@ const authSlice = createSlice({
         state.token = action.payload.accessToken;
         state.isAuthenticated = true;
         localStorage.setItem('token', action.payload.accessToken);
-        
-        // Sync cart after login
-        store.dispatch(syncCartOnLogin());
       })
       .addCase(login.rejected, (state, action) => {
         state.isLoading = false;

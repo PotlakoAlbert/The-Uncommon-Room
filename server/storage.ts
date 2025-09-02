@@ -48,6 +48,7 @@ export interface IStorage {
   // Product operations
   getProduct(id: number): Promise<Product | undefined>;
   getAllProducts(filters?: { category?: string; minPrice?: number; maxPrice?: number; material?: string; search?: string }): Promise<Product[]>;
+  getAllProductsForAdmin(filters?: { category?: string; minPrice?: number; maxPrice?: number; material?: string; search?: string }): Promise<Product[]>;
   createProduct(product: InsertProduct): Promise<Product>;
   updateProduct(id: number, product: Partial<InsertProduct>): Promise<Product>;
   deleteProduct(id: number): Promise<boolean>;
@@ -90,6 +91,13 @@ export interface IStorage {
     totalProducts: number;
     totalUsers: number;
   }>;
+
+  // Report operations
+  generateSalesReport(startDate?: string, endDate?: string): Promise<any>;
+  generateInventoryReport(): Promise<any>;
+  generateCustomerReport(startDate?: string, endDate?: string): Promise<any>;
+  generateProductReport(startDate?: string, endDate?: string): Promise<any>;
+  generateCustomDesignReport(startDate?: string, endDate?: string): Promise<any>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -135,6 +143,23 @@ export class DatabaseStorage implements IStorage {
 
   async createAdmin(admin: InsertAdmin): Promise<Admin> {
     const [newAdmin] = await db.insert(admins).values(admin).returning();
+    
+    // Also create a corresponding user record
+    try {
+      await this.createUser({
+        name: newAdmin.name,
+        email: newAdmin.email,
+        passwordHash: newAdmin.passwordHash,
+        role: 'admin',
+        phone: newAdmin.phone,
+        address: newAdmin.address,
+        adminId: newAdmin.adminId
+      });
+    } catch (error) {
+      console.error('Failed to create user record for admin:', error);
+      // Don't throw here as the admin was created successfully
+    }
+    
     return newAdmin;
   }
 
@@ -152,6 +177,35 @@ export class DatabaseStorage implements IStorage {
     search?: string 
   }): Promise<Product[]> {
     let query = db.select().from(products).where(eq(products.active, true));
+
+    if (filters?.category) {
+      query = query.where(eq(products.category, filters.category as any));
+    }
+    if (filters?.minPrice) {
+      query = query.where(gte(products.price, filters.minPrice.toString()));
+    }
+    if (filters?.maxPrice) {
+      query = query.where(lte(products.price, filters.maxPrice.toString()));
+    }
+    if (filters?.material) {
+      query = query.where(like(products.material, `%${filters.material}%`));
+    }
+    if (filters?.search) {
+      query = query.where(like(products.name, `%${filters.search}%`));
+    }
+
+    return await query.orderBy(desc(products.createdAt));
+  }
+
+  async getAllProductsForAdmin(filters?: { 
+    category?: string; 
+    minPrice?: number; 
+    maxPrice?: number; 
+    material?: string; 
+    search?: string 
+  }): Promise<Product[]> {
+    // For admin, get all products (including inactive ones)
+    let query = db.select().from(products);
 
     if (filters?.category) {
       query = query.where(eq(products.category, filters.category as any));
@@ -304,20 +358,70 @@ export class DatabaseStorage implements IStorage {
     return newOrder;
   }
 
-  async getOrder(id: number): Promise<Order | undefined> {
-    const [order] = await db.select().from(orders).where(eq(orders.id, id));
+  async getOrder(id: number): Promise<any | undefined> {
+    const [order] = await db
+      .select({
+        ordId: orders.id,
+        userId: orders.userId,
+        orderDate: orders.orderDate,
+        status: orders.status,
+        totalAmount: orders.totalAmount,
+        shippingAddress: orders.shippingAddress,
+        paymentMethod: orders.paymentMethod,
+        paymentStatus: orders.paymentStatus,
+        createdAt: orders.createdAt,
+        updatedAt: orders.updatedAt,
+      })
+      .from(orders)
+      .where(eq(orders.id, id));
     return order;
   }
 
-  async getUserOrders(userId: number): Promise<Order[]> {
-    return await db.select().from(orders)
+  async getUserOrders(userId: number): Promise<any[]> {
+    return await db
+      .select({
+        ordId: orders.id,
+        userId: orders.userId,
+        orderDate: orders.orderDate,
+        status: orders.status,
+        totalAmount: orders.totalAmount,
+        shippingAddress: orders.shippingAddress,
+        paymentMethod: orders.paymentMethod,
+        paymentStatus: orders.paymentStatus,
+        createdAt: orders.createdAt,
+        updatedAt: orders.updatedAt,
+      })
+      .from(orders)
       .where(eq(orders.userId, userId))
       .orderBy(desc(orders.createdAt));
   }
 
-  async getAllOrders(): Promise<(Order & { user: User })[]> {
+  async getAllOrders(): Promise<any[]> {
     return await db
-      .select()
+      .select({
+        orders: {
+          ordId: orders.id,
+          userId: orders.userId,
+          orderDate: orders.orderDate,
+          status: orders.status,
+          totalAmount: orders.totalAmount,
+          shippingAddress: orders.shippingAddress,
+          paymentMethod: orders.paymentMethod,
+          paymentStatus: orders.paymentStatus,
+          createdAt: orders.createdAt,
+          updatedAt: orders.updatedAt,
+        },
+        customers: {
+          customerId: users.id,
+          name: users.name,
+          email: users.email,
+          phone: users.phone,
+          address: users.address,
+          role: users.role,
+          createdAt: users.createdAt,
+          updatedAt: users.updatedAt,
+        }
+      })
       .from(orders)
       .innerJoin(users, eq(orders.userId, users.id))
       .orderBy(desc(orders.createdAt));
@@ -447,6 +551,221 @@ export class DatabaseStorage implements IStorage {
       totalRevenue: orderStats.totalRevenue || "0",
       totalProducts: productCount.count || 0,
       totalUsers: userCount.count || 0,
+    };
+  }
+
+  // Report operations
+  async generateSalesReport(startDate?: string, endDate?: string): Promise<any> {
+    // Build date filter conditions
+    let dateFilter = sql`1=1`;
+    if (startDate && endDate) {
+      dateFilter = sql`${orders.createdAt} >= ${startDate} AND ${orders.createdAt} <= ${endDate}`;
+    }
+
+    // Total sales and orders
+    const [salesStats] = await db
+      .select({
+        totalSales: sql<number>`coalesce(sum(total_amount), 0)`,
+        totalOrders: sql<number>`count(*)`,
+      })
+      .from(orders)
+      .where(dateFilter);
+
+    // Top selling products
+    const topProducts = await db
+      .select({
+        name: products.name,
+        quantitySold: sql<number>`coalesce(sum(${orderItems.quantity}), 0)`,
+        revenue: sql<number>`coalesce(sum(${orderItems.quantity} * ${orderItems.unitPrice}), 0)`,
+      })
+      .from(orderItems)
+      .innerJoin(products, eq(orderItems.productId, products.prodId))
+      .innerJoin(orders, eq(orderItems.orderId, orders.id))
+      .where(dateFilter)
+      .groupBy(products.prodId, products.name)
+      .orderBy(sql`coalesce(sum(${orderItems.quantity} * ${orderItems.unitPrice}), 0) DESC`)
+      .limit(10);
+
+    // Recent orders
+    const recentOrders = await db
+      .select({
+        id: orders.id,
+        customerName: users.name,
+        total: orders.totalAmount,
+        status: orders.status,
+        createdAt: orders.createdAt,
+      })
+      .from(orders)
+      .innerJoin(users, eq(orders.userId, users.id))
+      .where(dateFilter)
+      .orderBy(desc(orders.createdAt))
+      .limit(10);
+
+    // Sales by month
+    const salesByMonth = await db
+      .select({
+        month: sql<string>`to_char(${orders.createdAt}, 'YYYY-MM')`,
+        sales: sql<number>`coalesce(sum(total_amount), 0)`,
+        orders: sql<number>`count(*)`,
+      })
+      .from(orders)
+      .where(dateFilter)
+      .groupBy(sql`to_char(${orders.createdAt}, 'YYYY-MM')`)
+      .orderBy(sql`to_char(${orders.createdAt}, 'YYYY-MM') DESC`)
+      .limit(12);
+
+    return {
+      totalSales: parseFloat(salesStats.totalSales?.toString() || '0'),
+      totalOrders: salesStats.totalOrders || 0,
+      topSellingProducts: topProducts,
+      recentOrders,
+      salesByMonth,
+    };
+  }
+
+  async generateInventoryReport(): Promise<any> {
+    const inventoryData = await db
+      .select({
+        productId: products.prodId,
+        name: products.name,
+        category: products.category,
+        price: products.price,
+        quantity: inventory.quantity,
+        costPrice: inventory.costPrice,
+        lastUpdated: inventory.lastUpdated,
+      })
+      .from(inventory)
+      .innerJoin(products, eq(inventory.productId, products.prodId))
+      .orderBy(products.name);
+
+    const lowStockItems = inventoryData.filter(item => item.quantity <= 5);
+    const outOfStockItems = inventoryData.filter(item => item.quantity === 0);
+
+    return {
+      totalProducts: inventoryData.length,
+      totalValue: inventoryData.reduce((sum, item) => sum + (parseFloat(item.price) * item.quantity), 0),
+      lowStockItems: lowStockItems.length,
+      outOfStockItems: outOfStockItems.length,
+      inventoryData,
+      lowStockItems,
+      outOfStockItems,
+    };
+  }
+
+  async generateCustomerReport(startDate?: string, endDate?: string): Promise<any> {
+    // Build date filter conditions
+    let dateFilter = sql`1=1`;
+    if (startDate && endDate) {
+      dateFilter = sql`${users.createdAt} >= ${startDate} AND ${users.createdAt} <= ${endDate}`;
+    }
+
+    const [customerStats] = await db
+      .select({
+        totalCustomers: sql<number>`count(*)`,
+        newCustomers: sql<number>`count(*)`,
+      })
+      .from(users)
+      .where(and(eq(users.role, 'user'), dateFilter));
+
+    const topCustomers = await db
+      .select({
+        id: users.id,
+        name: users.name,
+        email: users.email,
+        totalOrders: sql<number>`count(${orders.id})`,
+        totalSpent: sql<number>`coalesce(sum(${orders.totalAmount}), 0)`,
+      })
+      .from(users)
+      .leftJoin(orders, eq(users.id, orders.userId))
+      .where(eq(users.role, 'user'))
+      .groupBy(users.id, users.name, users.email)
+      .orderBy(sql`coalesce(sum(${orders.totalAmount}), 0) DESC`)
+      .limit(10);
+
+    return {
+      totalCustomers: customerStats.totalCustomers || 0,
+      newCustomers: customerStats.newCustomers || 0,
+      topCustomers,
+    };
+  }
+
+  async generateProductReport(startDate?: string, endDate?: string): Promise<any> {
+    const [productStats] = await db
+      .select({
+        totalProducts: sql<number>`count(*)`,
+        activeProducts: sql<number>`count(*)`,
+      })
+      .from(products)
+      .where(eq(products.active, true));
+
+    const productPerformance = await db
+      .select({
+        productId: products.prodId,
+        name: products.name,
+        category: products.category,
+        price: products.price,
+        totalSold: sql<number>`coalesce(sum(${orderItems.quantity}), 0)`,
+        totalRevenue: sql<number>`coalesce(sum(${orderItems.quantity} * ${orderItems.unitPrice}), 0)`,
+        orderCount: sql<number>`count(distinct ${orderItems.orderId})`,
+      })
+      .from(products)
+      .leftJoin(orderItems, eq(products.prodId, orderItems.productId))
+      .leftJoin(orders, eq(orderItems.orderId, orders.id))
+      .where(eq(products.active, true))
+      .groupBy(products.prodId, products.name, products.category, products.price)
+      .orderBy(sql`coalesce(sum(${orderItems.quantity} * ${orderItems.unitPrice}), 0) DESC`);
+
+    return {
+      totalProducts: productStats.totalProducts || 0,
+      activeProducts: productStats.activeProducts || 0,
+      productPerformance,
+    };
+  }
+
+  async generateCustomDesignReport(startDate?: string, endDate?: string): Promise<any> {
+    let whereClause = sql`1=1`;
+    
+    if (startDate && endDate) {
+      whereClause = sql`${customDesignRequests.createdAt} >= ${startDate} AND ${customDesignRequests.createdAt} <= ${endDate}`;
+    }
+
+    const [designStats] = await db
+      .select({
+        totalRequests: sql<number>`count(*)`,
+        pendingRequests: sql<number>`count(*)`,
+      })
+      .from(customDesignRequests)
+      .where(whereClause);
+
+    const statusBreakdown = await db
+      .select({
+        status: customDesignRequests.status,
+        count: sql<number>`count(*)`,
+      })
+      .from(customDesignRequests)
+      .where(whereClause)
+      .groupBy(customDesignRequests.status);
+
+    const recentRequests = await db
+      .select({
+        designId: customDesignRequests.designId,
+        customerName: users.name,
+        furnitureType: customDesignRequests.furnitureType,
+        status: customDesignRequests.status,
+        quoteAmount: customDesignRequests.quoteAmount,
+        createdAt: customDesignRequests.createdAt,
+      })
+      .from(customDesignRequests)
+      .innerJoin(users, eq(customDesignRequests.userId, users.id))
+      .where(whereClause)
+      .orderBy(desc(customDesignRequests.createdAt))
+      .limit(10);
+
+    return {
+      totalRequests: designStats.totalRequests || 0,
+      pendingRequests: designStats.pendingRequests || 0,
+      statusBreakdown,
+      recentRequests,
     };
   }
 }

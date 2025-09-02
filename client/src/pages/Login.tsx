@@ -6,6 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { loginSuccess } from "@/store/authSlice";
+import { syncCartOnLogin } from "@/store/cartSlice";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,6 +45,8 @@ export default function Login() {
         user: { ...(data.user || data.customer), type: 'customer' },
         token: data.token,
       }));
+      // Sync cart after successful login
+      dispatch(syncCartOnLogin());
       toast({
         title: "Login Successful",
         description: "Welcome back!",

@@ -5,6 +5,7 @@ import { RootState } from "@/store/store";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { apiRequest } from "@/lib/queryClient";
 
 export default function AdminDashboard() {
   const [, setLocation] = useLocation();
@@ -12,12 +13,9 @@ export default function AdminDashboard() {
 
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ['/api/admin/dashboard'],
-    enabled: isAuthenticated && user?.type === 'admin',
+    enabled: isAuthenticated && user?.role === 'admin',
     queryFn: async () => {
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/admin/dashboard', {
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
+      const response = await apiRequest('GET', '/api/admin/dashboard');
       if (!response.ok) throw new Error('Failed to fetch dashboard stats');
       return response.json();
     },
@@ -25,19 +23,16 @@ export default function AdminDashboard() {
 
   const { data: recentOrders, isLoading: ordersLoading } = useQuery({
     queryKey: ['/api/admin/orders'],
-    enabled: isAuthenticated && user?.type === 'admin',
+    enabled: isAuthenticated && user?.role === 'admin',
     queryFn: async () => {
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/admin/orders', {
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
+      const response = await apiRequest('GET', '/api/admin/orders');
       if (!response.ok) throw new Error('Failed to fetch orders');
       const orders = await response.json();
       return orders.slice(0, 5); // Show only recent 5 orders
     },
   });
 
-  if (!isAuthenticated || user?.type !== 'admin') {
+  if (!isAuthenticated || user?.role !== 'admin') {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -226,6 +221,16 @@ export default function AdminDashboard() {
           >
             <span className="material-icons text-2xl text-primary">support_agent</span>
             <span>View Inquiries</span>
+          </Button>
+          
+          <Button 
+            onClick={() => setLocation('/admin/reports')}
+            variant="outline" 
+            className="p-6 h-auto flex flex-col space-y-2"
+            data-testid="button-view-reports"
+          >
+            <span className="material-icons text-2xl text-primary">assessment</span>
+            <span>View Reports</span>
           </Button>
         </div>
 

@@ -77,6 +77,17 @@ export const designStatusEnum = pgEnum("design_status", [
 export const roleEnum = pgEnum("role", ["user", "admin"]);
 
 // Tables
+export const admins = pgTable("admins", {
+  adminId: serial("admin_id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  phone: varchar("phone", { length: 20 }),
+  address: text("address"),
+  email: varchar("email", { length: 255 }).unique().notNull(),
+  passwordHash: varchar("password_hash", { length: 255 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
@@ -86,6 +97,7 @@ export const users = pgTable("users", {
   phone: varchar("phone", { length: 50 }),
   address: text("address"),
   refreshToken: text("refresh_token"),
+  adminId: integer("admin_id").references(() => admins.adminId),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -108,17 +120,6 @@ export const products = pgTable("products", {
   galleryImages: json("gallery_images").$type<string[]>().default([]),
   material: varchar("material", { length: 100 }),
   dimensions: varchar("dimensions", { length: 255 }),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
-
-export const admins = pgTable("admins", {
-  adminId: serial("admin_id").primaryKey(),
-  name: varchar("name", { length: 255 }).notNull(),
-  phone: varchar("phone", { length: 20 }),
-  address: text("address"),
-  email: varchar("email", { length: 255 }).unique().notNull(),
-  passwordHash: varchar("password_hash", { length: 255 }).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

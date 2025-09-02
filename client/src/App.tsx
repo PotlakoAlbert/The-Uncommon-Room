@@ -29,6 +29,7 @@ import AdminInquiries from "@/pages/admin/AdminInquiries";
 import AdminInventory from "@/pages/admin/AdminInventory";
 import AdminCustomDesigns from "@/pages/admin/AdminCustomDesigns";
 import AdminReports from "@/pages/admin/AdminReports";
+import AdminManagement from "@/pages/admin/AdminManagement";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -75,6 +76,7 @@ function Router() {
       <Route path="/admin/inventory" component={AdminInventory} />
       <Route path="/admin/custom-designs" component={AdminCustomDesigns} />
       <Route path="/admin/reports" component={AdminReports} />
+      <Route path="/admin/admins" component={AdminManagement} />
       
       {/* Fallback to 404 */}
       <Route component={NotFound} />

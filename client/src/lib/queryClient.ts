@@ -22,8 +22,9 @@ export async function apiRequest(
   
   const headers: Record<string, string> = {};
   
-  // Add Content-Type for requests with data
-  if (data) {
+  // Add Content-Type for JSON requests with data (skip for FormData)
+  const isFormData = typeof FormData !== 'undefined' && data instanceof FormData;
+  if (data && !isFormData) {
     headers["Content-Type"] = "application/json";
   }
   
@@ -33,9 +34,9 @@ export async function apiRequest(
   }
 
   const res = await fetch(url, {
-    method,
-    headers,
-    body: data ? JSON.stringify(data) : undefined,
+  method,
+  headers,
+  body: data ? (isFormData ? (data as FormData) : JSON.stringify(data)) : undefined,
     credentials: "include",
   });
 

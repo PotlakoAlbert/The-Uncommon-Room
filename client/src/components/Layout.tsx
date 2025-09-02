@@ -1,7 +1,8 @@
+import React from "react";
 import { useLocation } from "wouter";
-import { useIsMobile } from "@/hooks/use-mobile";
-import MobileNavigation from "./MobileNavigation";
-import DesktopNavigation from "./DesktopNavigation";
+import { useAppSelector } from "@/store/hooks";
+import { Sidebar } from "./Sidebar";
+import { adminNavItems, customerNavItems } from "@/config/navigation";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -9,7 +10,7 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   const [location] = useLocation();
-  const isMobile = useIsMobile();
+  const { isAuthenticated } = useAppSelector((state) => state.auth);
   const isAdminRoute = location.startsWith('/admin');
 
   // Don't show navigation on admin login page
@@ -18,15 +19,13 @@ export default function Layout({ children }: LayoutProps) {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {isMobile ? (
-        <MobileNavigation isAdminRoute={isAdminRoute} />
-      ) : (
-        <DesktopNavigation isAdminRoute={isAdminRoute} />
-      )}
-      <main className={`${isMobile ? 'pb-16' : ''} ${isAdminRoute ? 'pt-0' : ''}`}>
+    <Sidebar 
+      items={isAdminRoute ? adminNavItems : customerNavItems} 
+      isAdmin={isAdminRoute}
+    >
+      <div className="p-4 lg:p-8">
         {children}
-      </main>
-    </div>
+      </div>
+    </Sidebar>
   );
 }

@@ -61,6 +61,13 @@ export default function DesktopNavigation({ isAdminRoute }: DesktopNavigationPro
                     Inquiries
                   </Link>
                   <Link
+                    href="/admin/admins"
+                    className={`${location === '/admin/admins' ? 'text-primary' : 'text-muted-foreground'} hover:text-primary transition-colors`}
+                    data-testid="link-admin-management"
+                  >
+                    Manage Admins
+                  </Link>
+                  <Link
                     href="/admin/reports"
                     className={`${location === '/admin/reports' ? 'text-primary' : 'text-muted-foreground'} hover:text-primary transition-colors`}
                     data-testid="link-admin-reports"

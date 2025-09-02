@@ -28,7 +28,7 @@ export class CartService {
   static async syncCartOnLogin(localCartItems: LocalCartItem[]): Promise<LocalCartItem[]> {
     try {
       // Get server cart to check if it exists
-      await apiRequest('GET', '/api/cart');
+  await apiRequest('GET', '/api/cart');
       
       // If user has items in local cart, add them to server
       if (localCartItems.length > 0) {
@@ -42,10 +42,11 @@ export class CartService {
       }
 
       // Fetch updated server cart and convert to local format
-      const updatedResponse = await apiRequest('GET', '/api/cart');
-      const updatedCart = await updatedResponse.json();
-      
-      return this.convertServerCartToLocal(updatedCart.items || []);
+  const updatedResponse = await apiRequest('GET', '/api/cart');
+  const updatedCart = await updatedResponse.json();
+  // Server returns an array of items. Fallback to .items when needed.
+  const serverItems = Array.isArray(updatedCart) ? updatedCart : (updatedCart?.items ?? []);
+  return this.convertServerCartToLocal(serverItems);
     } catch (error) {
       console.error('Failed to sync cart:', error);
       // Return local cart if sync fails
@@ -60,7 +61,8 @@ export class CartService {
     customNotes?: string;
   }): Promise<void> {
     try {
-      await apiRequest('POST', '/api/cart/items', item);
+  // Server expects POST /api/cart with body { productId, quantity, customNotes }
+  await apiRequest('POST', '/api/cart', item);
     } catch (error) {
       console.error('Failed to add item to server cart:', error);
       throw error;
@@ -70,7 +72,8 @@ export class CartService {
   // Update item in server cart
   static async updateServerCartItem(id: number, quantity: number, customNotes?: string): Promise<void> {
     try {
-      await apiRequest('PUT', `/api/cart/items/${id}`, { quantity, customNotes });
+  // Server route is PUT /api/cart/item/:id
+  await apiRequest('PUT', `/api/cart/item/${id}`, { quantity, customNotes });
     } catch (error) {
       console.error('Failed to update server cart item:', error);
       throw error;
@@ -80,7 +83,8 @@ export class CartService {
   // Remove item from server cart
   static async removeFromServerCart(id: number): Promise<void> {
     try {
-      await apiRequest('DELETE', `/api/cart/items/${id}`);
+  // Server route is DELETE /api/cart/item/:id
+  await apiRequest('DELETE', `/api/cart/item/${id}`);
     } catch (error) {
       console.error('Failed to remove item from server cart:', error);
       throw error;
@@ -91,18 +95,19 @@ export class CartService {
   static async getServerCart(): Promise<LocalCartItem[]> {
     try {
       const response = await apiRequest('GET', '/api/cart', undefined, { throwOn401: false });
-      
-      // If unauthorized, return empty array (user not authenticated)
+      // If unauthorized, throw so thunk is rejected and auth flag remains false
       if (response.status === 401) {
-        return [];
+        throw new Error('Unauthorized');
       }
       
-      const serverCart = await response.json();
-      return this.convertServerCartToLocal(serverCart.items || []);
+  const serverCart = await response.json();
+  // Server returns an array of items. Fallback to .items when needed.
+  const serverItems = Array.isArray(serverCart) ? serverCart : (serverCart?.items ?? []);
+  return this.convertServerCartToLocal(serverItems);
     } catch (error) {
       console.error('Failed to get server cart:', error);
-      // Return empty array if server request fails (user not authenticated)
-      return [];
+  // Propagate error for thunk rejection
+  throw error;
     }
   }
 

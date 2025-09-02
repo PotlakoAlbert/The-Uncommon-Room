@@ -16,7 +16,7 @@ export default function ProductDetail() {
   const [, setLocation] = useLocation();
   const dispatch = useDispatch();
   const { toast } = useToast();
-  const { isAuthenticated } = useSelector((state: RootState) => state.auth);
+  const { isAuthenticated, user } = useSelector((state: RootState) => state.auth);
   const [quantity, setQuantity] = useState(1);
   const [customNotes, setCustomNotes] = useState("");
   const [selectedImage, setSelectedImage] = useState(0);
@@ -251,15 +251,17 @@ export default function ProductDetail() {
 
             {/* Action Buttons */}
             <div className="space-y-4">
-              <Button
-                size="lg"
-                className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
-                onClick={handleAddToCart}
-                data-testid="button-add-to-cart"
-              >
-                <span className="material-icons mr-2">shopping_cart</span>
-                Add to Cart
-              </Button>
+              {user?.role !== 'admin' && (
+                <Button
+                  size="lg"
+                  className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+                  onClick={handleAddToCart}
+                  data-testid="button-add-to-cart"
+                >
+                  <span className="material-icons mr-2">shopping_cart</span>
+                  Add to Cart
+                </Button>
+              )}
               
               <div className="grid grid-cols-2 gap-4">
                 <Button

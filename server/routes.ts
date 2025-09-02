@@ -6,6 +6,7 @@ import jwt from "jsonwebtoken";
 import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
+import { roleEnum } from "@shared/schema";
 import multer from "multer";
 import { v2 as cloudinary } from "cloudinary";
 import nodemailer from "nodemailer";
@@ -17,6 +18,7 @@ import swaggerUi from "swagger-ui-express";
 import cookieParser from "cookie-parser";
 import authRoutes from "./routes/auth";
 import cartRoutes from "./routes/cart";
+import adminRoutes from "./routes/admin";
 
 // Nodemailer transporter configuration
 const transporter = nodemailer.createTransport({
@@ -70,6 +72,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     crossOriginEmbedderPolicy: false,
   }));
   // app.use(limiter); // Temporarily disabled for debugging
+
+  // API routes
+  app.use('/api/auth', authRoutes);
+  app.use('/api/cart', cartRoutes);
+  app.use('/api/admins', adminRoutes);
 
   // Swagger documentation
   app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(specs));
@@ -272,13 +279,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // If no user record exists, create one
       if (!userRecord) {
+        const { name, email, passwordHash, phone, address } = admin;
         userRecord = await storage.createUser({
-          name: admin.name,
-          email: admin.email,
-          passwordHash: admin.passwordHash, // Use the same password hash
+          name,
+          email,
+          passwordHash,
           role: 'admin',
-          phone: admin.phone,
-          address: admin.address,
+          phone,
+          address,
           adminId: admin.adminId
         });
       }
@@ -618,6 +626,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Parse optional referenceLinks (JSON array of URLs) from multipart form
+      let referenceLinks: string[] = [];
+      try {
+        if (req.body.referenceLinks) {
+          const parsed = JSON.parse(req.body.referenceLinks);
+          if (Array.isArray(parsed)) {
+            referenceLinks = parsed
+              .map((u: any) => (typeof u === 'string' ? u.trim() : ''))
+              .filter((u: string) => u.length > 0);
+          }
+        }
+      } catch (e) {
+        console.warn('Invalid referenceLinks JSON provided, ignoring');
+      }
+
       const request = await storage.createCustomDesignRequest({
         userId: customerId,
         furnitureType: req.body.furnitureType,
@@ -625,8 +648,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         materialPreference: req.body.materialPreference,
         colorPreference: req.body.colorPreference,
         specialRequirements: req.body.specialRequirements,
-        budgetRange: req.body.budgetRange,
-        referenceImages: imageUrls,
+  budgetRange: req.body.budgetRange,
+  referenceImages: imageUrls,
+  referenceLinks,
       });
 
       // Send notification email to admin
@@ -718,6 +742,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.put('/api/admin/custom-designs/:id/status', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { status, quoteAmount } = req.body as { status: string; quoteAmount?: string };
+      if (!status) return res.status(400).json({ message: 'Status is required' });
+      const updated = await storage.updateCustomDesignStatus(id, status, quoteAmount);
+      res.json(updated);
+    } catch (error) {
+      console.error('Update custom design status error:', error);
+      res.status(500).json({ message: 'Failed to update custom design status' });
+    }
+  });
+
   // Admin products GET route
   app.get('/api/admin/products', authenticateToken, requireAdmin, async (req, res) => {
     try {
@@ -786,6 +823,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Create product error:', error);
       res.status(500).json({ message: 'Failed to create product' });
+    }
+  });
+
+  // Admin delete product (soft delete -> sets active=false)
+  app.delete('/api/admin/products/:id', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (!id) return res.status(400).json({ message: 'Invalid product id' });
+      const success = await storage.deleteProduct(id);
+      if (!success) return res.status(404).json({ message: 'Product not found' });
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Delete product error:', error);
+      res.status(500).json({ message: 'Failed to delete product' });
     }
   });
 
@@ -859,7 +910,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { type, range, startDate, endDate, format } = req.query;
       
-      // For now, return JSON data. In a real implementation, you would generate PDF/CSV/Excel files
       let reportData;
       let dateFilter = { startDate: undefined as string | undefined, endDate: undefined as string | undefined };
 
@@ -894,25 +944,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ message: 'Invalid report type' });
       }
 
-      // Set appropriate headers based on format
-      if (format === 'pdf') {
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename="${type}-report.pdf"`);
-      } else if (format === 'csv') {
-        res.setHeader('Content-Type', 'text/csv');
-        res.setHeader('Content-Disposition', `attachment; filename="${type}-report.csv"`);
-      } else if (format === 'excel') {
-        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        res.setHeader('Content-Disposition', `attachment; filename="${type}-report.xlsx"`);
-      } else {
-        res.setHeader('Content-Type', 'application/json');
+      // Helper to convert array of objects to CSV
+      const toCsv = (rows: any[], columns?: string[]) => {
+        if (!rows || rows.length === 0) return '';
+        const headers = columns || Object.keys(rows[0]);
+        const escape = (val: any) => {
+          const s = val === null || val === undefined ? '' : String(val);
+          if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+            return '"' + s.replace(/"/g, '""') + '"';
+          }
+          return s;
+        };
+        const headerLine = headers.join(',');
+        const lines = rows.map(row => headers.map(h => escape((row as any)[h])).join(','));
+        return [headerLine, ...lines].join('\n');
+      };
+
+      // If CSV/Excel requested, build a reasonable dataset per report type
+      if (format === 'csv' || format === 'excel') {
+        let rows: any[] = [];
+        let columns: string[] | undefined = undefined;
+        switch (type) {
+          case 'sales':
+            rows = reportData.salesByMonth || [];
+            columns = ['month', 'sales', 'orders'];
+            break;
+          case 'inventory':
+            rows = reportData.inventoryData || [];
+            columns = ['productId', 'name', 'category', 'price', 'quantity', 'costPrice', 'lastUpdated'];
+            break;
+          case 'customers':
+            rows = reportData.topCustomers || [];
+            columns = ['id', 'name', 'email', 'totalOrders', 'totalSpent'];
+            break;
+          case 'products':
+            rows = reportData.productPerformance || [];
+            columns = ['productId', 'name', 'category', 'price', 'totalSold', 'totalRevenue', 'orderCount'];
+            break;
+          case 'custom_designs':
+            rows = reportData.recentRequests || [];
+            columns = ['designId', 'customerName', 'furnitureType', 'status', 'quoteAmount', 'createdAt'];
+            break;
+        }
+        const csv = toCsv(rows, columns);
+        const filename = `${type}-report.${format === 'excel' ? 'csv' : 'csv'}`;
+        res.setHeader('Content-Type', format === 'excel' ? 'text/csv' : 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        return res.send(csv);
       }
 
-      // For now, return JSON. In production, you would use libraries like:
-      // - PDF: puppeteer, jsPDF, or PDFKit
-      // - CSV: csv-writer or fast-csv
-      // - Excel: exceljs or xlsx
-      res.json(reportData);
+      // Default to JSON (e.g., for pdf or unspecified): client can render or handle appropriately
+      res.setHeader('Content-Type', 'application/json');
+      return res.json(reportData);
     } catch (error) {
       console.error('Export report error:', error);
       res.status(500).json({ message: 'Failed to export report' });

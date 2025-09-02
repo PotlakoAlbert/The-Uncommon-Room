@@ -208,6 +208,8 @@ export const customDesignRequests = pgTable("custom_design_requests", {
   colorPreference: varchar("color_preference", { length: 100 }),
   specialRequirements: text("special_requirements"),
   referenceImages: json("reference_images").$type<string[]>().default([]),
+  // New: Additional links (Pinterest/Instagram/product pages). Stored separately from images.
+  referenceLinks: json("reference_links").$type<string[]>().default([]),
   budgetRange: varchar("budget_range", { length: 50 }),
   status: designStatusEnum("status").default("submitted"),
   quoteAmount: decimal("quote_amount", { precision: 10, scale: 2 }),
@@ -304,7 +306,6 @@ export const insertUserSchema = createInsertSchema(users).omit({
   createdAt: true,
   updatedAt: true,
   refreshToken: true,
-  role: true,
 });
 
 export const insertProductSchema = createInsertSchema(products).omit({

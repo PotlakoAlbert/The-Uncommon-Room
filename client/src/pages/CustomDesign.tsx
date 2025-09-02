@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 
 const customDesignSchema = z.object({
   furnitureType: z.string().min(1, "Furniture type is required"),
@@ -21,6 +22,8 @@ const customDesignSchema = z.object({
   colorPreference: z.string().optional(),
   specialRequirements: z.string().optional(),
   budgetRange: z.string().optional(),
+  // New: optional multi-line reference links (one URL per line)
+  referenceLinks: z.string().optional(),
 });
 
 type CustomDesignFormData = z.infer<typeof customDesignSchema>;
@@ -40,17 +43,17 @@ export default function CustomDesign() {
       colorPreference: "",
       specialRequirements: "",
       budgetRange: "",
+      referenceLinks: "",
     },
   });
 
   const submitDesignMutation = useMutation({
     mutationFn: async (data: CustomDesignFormData) => {
-      const token = localStorage.getItem('token');
       const formData = new FormData();
       
       // Add form fields
       Object.entries(data).forEach(([key, value]) => {
-        if (value) formData.append(key, value);
+        if (key !== 'referenceLinks' && value) formData.append(key, value as string);
       });
       
       // Add files
@@ -60,14 +63,17 @@ export default function CustomDesign() {
         });
       }
 
-      const response = await fetch('/api/custom-designs', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-        body: formData,
-      });
-
+      // Add reference links as JSON string array
+      if (data.referenceLinks) {
+        const links = data.referenceLinks
+          .split(/\r?\n/)
+          .map(l => l.trim())
+          .filter(l => l.length > 0);
+        if (links.length > 0) {
+          formData.append('referenceLinks', JSON.stringify(links));
+        }
+      }
+      const response = await apiRequest('POST', '/api/custom-designs', formData);
       if (!response.ok) throw new Error('Failed to submit design request');
       return response.json();
     },
@@ -337,6 +343,18 @@ export default function CustomDesign() {
                       </div>
                     )}
                   </div>
+                </div>
+
+                {/* Reference Links */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Reference Links (Optional)</label>
+                  <Textarea
+                    placeholder="Paste one URL per line (e.g., Pinterest, Instagram, product pages)"
+                    rows={3}
+                    {...form.register('referenceLinks')}
+                    data-testid="textarea-reference-links"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">We'll attach these links to your request.</p>
                 </div>
 
                 {/* Submit Button */}

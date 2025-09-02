@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { ZodError } from "zod";
-import { JsonWebTokenError } from "jsonwebtoken";
+import jwt from "jsonwebtoken";
 import { DrizzleError } from "drizzle-orm";
 
 export interface ApiError extends Error {
@@ -23,7 +23,7 @@ export const errorHandler = (
     });
   }
 
-  if (error instanceof JsonWebTokenError) {
+  if (error instanceof jwt.JsonWebTokenError) {
     return res.status(403).json({
       message: "Invalid token",
     });
@@ -51,6 +51,7 @@ export const errorHandler = (
 
 export class BadRequestError extends Error {
   statusCode = 400;
+  errors: any[] | undefined;
   constructor(message: string, errors?: any[]) {
     super(message);
     this.errors = errors;

@@ -1,5 +1,5 @@
 import { useDispatch, useSelector } from "react-redux";
-import { updateCartItem, removeFromCart, removeFromServerCart } from "@/store/cartSlice";
+import { updateCartItem, removeFromCart, removeFromServerCart, updateServerCartItem } from "@/store/cartSlice";
 import { RootState } from "@/store/store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,19 +23,31 @@ export default function CartItem({ item }: CartItemProps) {
 
   const handleQuantityChange = (newQuantity: number) => {
     if (newQuantity > 0) {
-      dispatch(updateCartItem({ 
-        id: item.cartItemId, 
-        quantity: newQuantity 
-      }));
+      if (isAuthenticated) {
+        // Sync with server when authenticated
+        dispatch(updateServerCartItem({ cartItemId: item.cartItemId, quantity: newQuantity } as any));
+      } else {
+        // Local only
+        dispatch(updateCartItem({ 
+          id: item.cartItemId, 
+          quantity: newQuantity 
+        }));
+      }
     }
   };
 
   const handleNotesChange = (notes: string) => {
-    dispatch(updateCartItem({ 
-      id: item.cartItemId, 
-      quantity: item.quantity,
-      customNotes: notes 
-    }));
+    if (isAuthenticated) {
+      // Sync with server when authenticated
+      dispatch(updateServerCartItem({ cartItemId: item.cartItemId, quantity: item.quantity, customNotes: notes } as any));
+    } else {
+      // Local only
+      dispatch(updateCartItem({ 
+        id: item.cartItemId, 
+        quantity: item.quantity,
+        customNotes: notes 
+      }));
+    }
   };
 
   const handleRemove = () => {

@@ -332,7 +332,7 @@ export default function AdminReports() {
               </CardContent>
             </Card>
           </div>
-        ) : reportData ? (
+  ) : reportData ? (
           <div className="space-y-6">
             {/* Summary Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -401,7 +401,7 @@ export default function AdminReports() {
               </Card>
             </div>
 
-            {/* Top Selling Products */}
+            {/* Top Selling Products (Sales report) */}
             {reportData.topSellingProducts && reportData.topSellingProducts.length > 0 && (
               <Card className="material-shadow">
                 <CardHeader>
@@ -436,7 +436,7 @@ export default function AdminReports() {
               </Card>
             )}
 
-            {/* Recent Orders */}
+            {/* Recent Orders (Sales report) */}
             {reportData.recentOrders && reportData.recentOrders.length > 0 && (
               <Card className="material-shadow">
                 <CardHeader>
@@ -491,7 +491,7 @@ export default function AdminReports() {
               </Card>
             )}
 
-            {/* Sales by Month */}
+            {/* Sales by Month (Sales report) */}
             {reportData.salesByMonth && reportData.salesByMonth.length > 0 && (
               <Card className="material-shadow">
                 <CardHeader>
@@ -519,6 +519,196 @@ export default function AdminReports() {
                   </div>
                 </CardContent>
               </Card>
+            )}
+
+            {/* Inventory Report */}
+            {selectedReportType === 'inventory' && reportData.inventoryData && (
+              <>
+                <Card className="material-shadow">
+                  <CardHeader>
+                    <CardTitle>Inventory Overview</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                      <div className="p-4 border rounded-lg">
+                        <p className="text-sm text-muted-foreground">Total Products</p>
+                        <p className="text-2xl font-bold">{reportData.totalProducts}</p>
+                      </div>
+                      <div className="p-4 border rounded-lg">
+                        <p className="text-sm text-muted-foreground">Total Value</p>
+                        <p className="text-2xl font-bold">R {reportData.totalValue?.toLocaleString?.() || reportData.totalValue}</p>
+                      </div>
+                      <div className="p-4 border rounded-lg">
+                        <p className="text-sm text-muted-foreground">Low Stock Items</p>
+                        <p className="text-2xl font-bold text-yellow-600">{reportData.lowStockItems}</p>
+                      </div>
+                      <div className="p-4 border rounded-lg">
+                        <p className="text-sm text-muted-foreground">Out of Stock</p>
+                        <p className="text-2xl font-bold text-red-600">{reportData.outOfStockItems}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="material-shadow">
+                  <CardHeader>
+                    <CardTitle>Inventory Details</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead className="bg-muted">
+                          <tr>
+                            <th className="text-left p-3">Product</th>
+                            <th className="text-left p-3">Category</th>
+                            <th className="text-left p-3">Price</th>
+                            <th className="text-left p-3">Qty</th>
+                            <th className="text-left p-3">Last Updated</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {reportData.inventoryData.map((row: any) => (
+                            <tr key={row.productId} className="border-b border-border">
+                              <td className="p-3">{row.name}</td>
+                              <td className="p-3 capitalize">{row.category}</td>
+                              <td className="p-3">R {parseFloat(row.price).toLocaleString()}</td>
+                              <td className="p-3">{row.quantity}</td>
+                              <td className="p-3">{row.lastUpdated ? new Date(row.lastUpdated).toLocaleString() : '-'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </CardContent>
+                </Card>
+              </>
+            )}
+
+            {/* Customer Report */}
+            {selectedReportType === 'customers' && reportData.topCustomers && (
+              <Card className="material-shadow">
+                <CardHeader>
+                  <CardTitle>Top Customers</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-muted">
+                        <tr>
+                          <th className="text-left p-3">Name</th>
+                          <th className="text-left p-3">Email</th>
+                          <th className="text-left p-3">Orders</th>
+                          <th className="text-left p-3">Total Spent</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {reportData.topCustomers.map((c: any) => (
+                          <tr key={c.id} className="border-b border-border">
+                            <td className="p-3">{c.name}</td>
+                            <td className="p-3">{c.email}</td>
+                            <td className="p-3">{c.totalOrders}</td>
+                            <td className="p-3">R {parseFloat(c.totalSpent).toLocaleString()}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Product Report */}
+            {selectedReportType === 'products' && reportData.productPerformance && (
+              <Card className="material-shadow">
+                <CardHeader>
+                  <CardTitle>Product Performance</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-muted">
+                        <tr>
+                          <th className="text-left p-3">Product</th>
+                          <th className="text-left p-3">Category</th>
+                          <th className="text-left p-3">Price</th>
+                          <th className="text-left p-3">Sold</th>
+                          <th className="text-left p-3">Revenue</th>
+                          <th className="text-left p-3">Order Count</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {reportData.productPerformance.map((p: any) => (
+                          <tr key={p.productId} className="border-b border-border">
+                            <td className="p-3">{p.name}</td>
+                            <td className="p-3 capitalize">{p.category}</td>
+                            <td className="p-3">R {parseFloat(p.price).toLocaleString()}</td>
+                            <td className="p-3">{p.totalSold}</td>
+                            <td className="p-3">R {parseFloat(p.totalRevenue).toLocaleString()}</td>
+                            <td className="p-3">{p.orderCount}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Custom Designs Report */}
+            {selectedReportType === 'custom_designs' && (reportData.statusBreakdown || reportData.recentRequests) && (
+              <>
+                {reportData.statusBreakdown && (
+                  <Card className="material-shadow">
+                    <CardHeader>
+                      <CardTitle>Status Breakdown</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {reportData.statusBreakdown.map((s: any) => (
+                          <div key={s.status} className="p-4 border rounded-lg">
+                            <p className="text-sm text-muted-foreground capitalize">{s.status}</p>
+                            <p className="text-2xl font-bold">{s.count}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {reportData.recentRequests && (
+                  <Card className="material-shadow">
+                    <CardHeader>
+                      <CardTitle>Recent Custom Design Requests</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead className="bg-muted">
+                            <tr>
+                              <th className="text-left p-3">Customer</th>
+                              <th className="text-left p-3">Type</th>
+                              <th className="text-left p-3">Status</th>
+                              <th className="text-left p-3">Quote</th>
+                              <th className="text-left p-3">Date</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {reportData.recentRequests.map((r: any) => (
+                              <tr key={r.designId} className="border-b border-border">
+                                <td className="p-3">{r.customerName}</td>
+                                <td className="p-3">{r.furnitureType}</td>
+                                <td className="p-3 capitalize">{r.status}</td>
+                                <td className="p-3">{r.quoteAmount ? `R ${parseFloat(r.quoteAmount).toLocaleString()}` : '-'}</td>
+                                <td className="p-3">{r.createdAt ? new Date(r.createdAt).toLocaleString() : '-'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </>
             )}
           </div>
         ) : (

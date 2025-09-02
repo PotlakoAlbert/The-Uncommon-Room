@@ -86,14 +86,24 @@ export default function AdminDashboard() {
               Welcome back, {user?.name}
             </p>
           </div>
-          <Button 
-            onClick={() => setLocation('/admin/products')}
-            className="bg-primary text-primary-foreground hover:bg-primary/90"
-            data-testid="button-add-new-product"
-          >
-            <span className="material-icons mr-2">add</span>
-            Add New Product
-          </Button>
+          <div className="flex gap-4">
+            <Button 
+              onClick={() => setLocation('/admin/admins')}
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
+              data-testid="button-manage-admins"
+            >
+              <span className="material-icons mr-2">admin_panel_settings</span>
+              Manage Admins
+            </Button>
+            <Button 
+              onClick={() => setLocation('/admin/products')}
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
+              data-testid="button-add-new-product"
+            >
+              <span className="material-icons mr-2">add</span>
+              Add New Product
+            </Button>
+          </div>
         </div>
 
         {/* Stats Cards */}

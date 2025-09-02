@@ -61,8 +61,10 @@ export default function AdminCustomDesigns() {
   });
 
   const updateDesignStatusMutation = useMutation({
-    mutationFn: async ({ designId, status }: { designId: number; status: string }) => {
-      const response = await apiRequest('PUT', `/api/admin/custom-designs/${designId}/status`, { status });
+    mutationFn: async ({ designId, status, quoteAmount }: { designId: number; status: string; quoteAmount?: string }) => {
+      const payload: any = { status };
+      if (quoteAmount && quoteAmount !== '') payload.quoteAmount = quoteAmount;
+      const response = await apiRequest('PUT', `/api/admin/custom-designs/${designId}/status`, payload);
       if (!response.ok) throw new Error('Failed to update design status');
       return response.json();
     },
@@ -109,6 +111,7 @@ export default function AdminCustomDesigns() {
     updateDesignStatusMutation.mutate({
       designId: selectedDesign.custom_design_requests.designId,
       status: data.status,
+      quoteAmount: data.quoteAmount,
     });
   };
 
@@ -259,7 +262,7 @@ export default function AdminCustomDesigns() {
                           #{design.custom_design_requests.designId}
                         </td>
                         <td className="p-4" data-testid={`text-design-customer-${design.custom_design_requests.designId}`}>
-                          {design.customers?.name || 'Unknown'}
+                          {design.users?.name || design.customers?.name || 'Unknown'}
                         </td>
                         <td className="p-4 capitalize" data-testid={`text-design-type-${design.custom_design_requests.designId}`}>
                           {design.custom_design_requests.furnitureType}
@@ -358,9 +361,9 @@ export default function AdminCustomDesigns() {
                   <div>
                     <h4 className="font-medium mb-3">Customer Information</h4>
                     <div className="space-y-2 text-sm">
-                      <p><strong>Name:</strong> {selectedDesign.customers?.name}</p>
-                      <p><strong>Email:</strong> {selectedDesign.customers?.email}</p>
-                      <p><strong>Phone:</strong> {selectedDesign.customers?.phone || 'Not provided'}</p>
+                      <p><strong>Name:</strong> {selectedDesign.users?.name || selectedDesign.customers?.name}</p>
+                      <p><strong>Email:</strong> {selectedDesign.users?.email || selectedDesign.customers?.email}</p>
+                      <p><strong>Phone:</strong> {selectedDesign.users?.phone || selectedDesign.customers?.phone || 'Not provided'}</p>
                     </div>
                   </div>
                   <div>
@@ -389,23 +392,56 @@ export default function AdminCustomDesigns() {
                   </div>
                 )}
 
-                {/* Reference Images */}
-                {selectedDesign.custom_design_requests.referenceImages && selectedDesign.custom_design_requests.referenceImages.length > 0 && (
+                {/* References (Images + Links) */}
+                {(Array.isArray(selectedDesign.custom_design_requests.referenceImages) && selectedDesign.custom_design_requests.referenceImages.length > 0) ||
+                 (Array.isArray(selectedDesign.custom_design_requests.referenceLinks) && selectedDesign.custom_design_requests.referenceLinks.length > 0) ? (
                   <div>
-                    <h4 className="font-medium mb-3">Reference Images</h4>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      {selectedDesign.custom_design_requests.referenceImages.map((image: string, index: number) => (
-                        <img 
-                          key={index}
-                          src={image} 
-                          alt={`Reference ${index + 1}`}
-                          className="w-full h-24 object-cover rounded border"
-                          data-testid={`img-reference-${selectedDesign.custom_design_requests.designId}-${index}`}
-                        />
-                      ))}
-                    </div>
+                    <h4 className="font-medium mb-3">References</h4>
+                    {(() => {
+                      const uploads: string[] = Array.isArray(selectedDesign.custom_design_requests.referenceImages)
+                        ? selectedDesign.custom_design_requests.referenceImages
+                        : [];
+                      const linksField: string[] = Array.isArray(selectedDesign.custom_design_requests.referenceLinks)
+                        ? selectedDesign.custom_design_requests.referenceLinks
+                        : [];
+                      const isImageUrl = (u: string) => /(\.png|\.jpg|\.jpeg|\.gif|\.webp|\.bmp|\.svg)(\?.*)?$/i.test(u) || u.includes('res.cloudinary.com');
+                      const imageLinks = linksField.filter(isImageUrl);
+                      const otherLinks = linksField.filter((u) => !isImageUrl(u));
+                      const imagesOnly: string[] = [...uploads, ...imageLinks];
+                      return (
+                        <>
+                          {imagesOnly.length > 0 && (
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3">
+                              {imagesOnly.map((image: string, index: number) => (
+                                <img
+                                  key={index}
+                                  src={image}
+                                  alt={`Reference ${index + 1}`}
+                                  className="w-full h-24 object-cover rounded border"
+                                  data-testid={`img-reference-${selectedDesign.custom_design_requests.designId}-${index}`}
+                                />
+                              ))}
+                            </div>
+                          )}
+                          {otherLinks.length > 0 && (
+                            <div>
+                              <h5 className="font-medium mb-2">Reference Links</h5>
+                              <ul className="list-disc pl-6 space-y-1 text-sm">
+                                {otherLinks.map((link: string, idx: number) => (
+                                  <li key={idx}>
+                                    <a href={link} target="_blank" rel="noopener noreferrer" className="text-primary underline break-all">
+                                      {link}
+                                    </a>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
-                )}
+                ) : null}
 
                 {/* Quick Actions */}
                 <div className="flex gap-2 pt-4 border-t">
@@ -424,7 +460,10 @@ export default function AdminCustomDesigns() {
                   <Button 
                     variant="outline"
                     onClick={() => {
-                      window.location.href = `mailto:${selectedDesign.customers?.email}?subject=Re: Custom Design Request #${selectedDesign.custom_design_requests.designId}`;
+                      const email = selectedDesign.users?.email || selectedDesign.customers?.email;
+                      if (email) {
+                        window.location.href = `mailto:${email}?subject=Re: Custom Design Request #${selectedDesign.custom_design_requests.designId}`;
+                      }
                     }}
                     data-testid={`button-email-customer-${selectedDesign.custom_design_requests.designId}`}
                   >
@@ -452,7 +491,7 @@ export default function AdminCustomDesigns() {
                   <div className="mb-4">
                     <h4 className="font-medium">{selectedDesign.custom_design_requests.furnitureType}</h4>
                     <p className="text-sm text-muted-foreground">
-                      Customer: {selectedDesign.customers?.name}
+                      Customer: {selectedDesign.users?.name || selectedDesign.customers?.name}
                     </p>
                   </div>
 

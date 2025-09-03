@@ -903,7 +903,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           case 'products':
             reportData = await storage.generateProductReport(dateFilter.startDate, dateFilter.endDate);
             break;
+          case 'customDesigns':
+            reportData = await storage.generateCustomDesignReport(dateFilter.startDate, dateFilter.endDate);
+            break;
           case 'custom_designs':
+            // Legacy support - redirect to customDesigns report
+            console.log('Redirecting legacy custom_designs report type to customDesigns');
             reportData = await storage.generateCustomDesignReport(dateFilter.startDate, dateFilter.endDate);
             break;
           default:

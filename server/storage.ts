@@ -855,88 +855,187 @@ export class DatabaseStorage implements IStorage {
 
   async generateCustomDesignReport(startDate?: string, endDate?: string): Promise<any> {
     try {
+      console.log('Generating custom design report...');
       let whereClause = sql`1=1`;
       
       if (startDate && endDate) {
         whereClause = sql`${customDesignRequests.createdAt} >= ${startDate} AND ${customDesignRequests.createdAt} <= ${endDate}`;
       }
 
-      // Count requests by status for summary stats
-      const statusCountsPromise = db
-        .select({
-          status: customDesignRequests.status,
-          count: sql<number>`count(*)`,
-        })
+      // First check if we have any custom design requests
+      const designCount = await db
+        .select({ count: sql`count(*)` })
         .from(customDesignRequests)
-        .where(whereClause)
-        .groupBy(customDesignRequests.status);
-      
-      // Get all custom design requests with user info
-      const customDesignsDataPromise = db
-        .select({
-          id: customDesignRequests.designId,
-          customer_name: users.name,
-          customer_email: users.email,
-          status: customDesignRequests.status,
-          description: customDesignRequests.description,
-          budget: customDesignRequests.budget,
-          timeline: customDesignRequests.timeline,
-          reference_links: customDesignRequests.referenceLinks,
-          created_at: customDesignRequests.createdAt,
-        })
-        .from(customDesignRequests)
-        .innerJoin(users, eq(customDesignRequests.userId, users.id))
-        .where(whereClause)
-        .orderBy(desc(customDesignRequests.createdAt));
-
-      // Legacy format - kept for backward compatibility
-      const recentRequestsPromise = db
-        .select({
-          designId: customDesignRequests.designId,
-          customerName: users.name,
-          furnitureType: customDesignRequests.furnitureType,
-          status: customDesignRequests.status,
-          quoteAmount: customDesignRequests.quoteAmount,
-          createdAt: customDesignRequests.createdAt,
-        })
-        .from(customDesignRequests)
-        .innerJoin(users, eq(customDesignRequests.userId, users.id))
-        .where(whereClause)
-        .orderBy(desc(customDesignRequests.createdAt))
-        .limit(10);
-
-      // Wait for all queries to complete
-      const [statusCounts, customDesignsData, recentRequests] = await Promise.all([
-        statusCountsPromise,
-        customDesignsDataPromise,
-        recentRequestsPromise
-      ]);
-
-      // Count totals by status
-      const pendingRequests = statusCounts.find(s => s.status === 'pending')?.count || 0;
-      const approvedRequests = statusCounts.find(s => s.status === 'approved')?.count || 0;
-      const rejectedRequests = statusCounts.find(s => s.status === 'rejected')?.count || 0;
-      const totalRequests = statusCounts.reduce((sum, item) => sum + Number(item.count), 0);
-
-      // Format data according to both new and legacy formats
-      return {
-        // New format
-        totalRequests,
-        pendingRequests,
-        approvedRequests,
-        rejectedRequests,
-        customDesignsData: customDesignsData.map(item => ({
-          ...item,
-          id: Number(item.id),
-          budget: item.budget || '0',
-          reference_links: item.reference_links || '',
-          customer_name: item.customer_name || 'Unknown'
-        })),
+        .then(result => Number(result[0].count));
         
-        // Legacy format
-        statusBreakdown: statusCounts,
-        recentRequests,
-      };
+      console.log(`Found ${designCount} custom design requests`);
+      
+      if (designCount === 0) {
+        // If no records, return an empty report structure
+        console.log('No custom design requests found, returning empty report');
+        return {
+          totalRequests: 0,
+          pendingRequests: 0,
+          approvedRequests: 0,
+          rejectedRequests: 0,
+          customDesignsData: [],
+          statusBreakdown: [],
+          recentRequests: [],
+        };
+      }
+
+      try {
+        // Count requests by status for summary stats
+        const statusCountsPromise = db
+          .select({
+            status: customDesignRequests.status,
+            count: sql<number>`count(*)`,
+          })
+          .from(customDesignRequests)
+          .where(whereClause)
+          .groupBy(customDesignRequests.status);
+        
+        // Get all custom design requests with user info
+        // Use a simplified query first to determine available columns
+        const columnsCheck = await db.query.customDesignRequests.findFirst({
+          with: { user: true },
+        });
+        
+        console.log('Available custom design fields:', Object.keys(columnsCheck || {}));
+        
+        // Adapt the query based on schema
+        const hasReferenceLinks = columnsCheck && 'referenceLinks' in columnsCheck;
+        console.log(`Schema ${hasReferenceLinks ? 'has' : 'does not have'} referenceLinks field`);
+        
+        // Get all custom design requests with user info
+        const customDesignsDataPromise = db
+          .select({
+            id: customDesignRequests.id,
+            designId: customDesignRequests.designId,
+            customer_name: users.name,
+            customer_email: users.email,
+            status: customDesignRequests.status,
+            description: customDesignRequests.description,
+            budget: customDesignRequests.budgetRange,
+            timeline: customDesignRequests.materialPreference, // Use as timeline approximation
+            // Only include referenceLinks if it exists in the schema
+            ...(hasReferenceLinks ? { reference_links: customDesignRequests.referenceLinks } : {}),
+            created_at: customDesignRequests.createdAt,
+          })
+          .from(customDesignRequests)
+          .innerJoin(users, eq(customDesignRequests.userId, users.id))
+          .where(whereClause)
+          .orderBy(desc(customDesignRequests.createdAt));
+
+        // Legacy format - kept for backward compatibility
+        const recentRequestsPromise = db
+          .select({
+            designId: customDesignRequests.designId,
+            customerName: users.name,
+            furnitureType: customDesignRequests.furnitureType,
+            status: customDesignRequests.status,
+            quoteAmount: customDesignRequests.quoteAmount,
+            createdAt: customDesignRequests.createdAt,
+          })
+          .from(customDesignRequests)
+          .innerJoin(users, eq(customDesignRequests.userId, users.id))
+          .where(whereClause)
+          .orderBy(desc(customDesignRequests.createdAt))
+          .limit(10);
+
+        // Wait for all queries to complete
+        const [statusCounts, customDesignsData, recentRequests] = await Promise.all([
+          statusCountsPromise,
+          customDesignsDataPromise,
+          recentRequestsPromise
+        ]);
+
+        console.log(`Retrieved ${customDesignsData.length} custom design records`);
+
+        // Count totals by status
+        const pendingRequests = statusCounts.find(s => s.status === 'pending')?.count || 0;
+        const approvedRequests = statusCounts.find(s => s.status === 'approved')?.count || 0;
+        const rejectedRequests = statusCounts.find(s => s.status === 'rejected')?.count || 0;
+        const totalRequests = statusCounts.reduce((sum, item) => sum + Number(item.count), 0);
+
+        // Format data according to both new and legacy formats
+        return {
+          // New format
+          totalRequests,
+          pendingRequests,
+          approvedRequests,
+          rejectedRequests,
+          customDesignsData: customDesignsData.map(item => {
+            // Use either id or designId
+            const id = item.id || item.designId || 0;
+            return {
+              id: Number(id),
+              customer_name: item.customer_name || 'Unknown',
+              customer_email: item.customer_email || 'No email provided',
+              status: item.status || 'Pending',
+              description: item.description || 'No description',
+              budget: item.budget || '0',
+              timeline: item.timeline || 'N/A',
+              reference_links: item.reference_links || [],
+              created_at: item.created_at || new Date().toISOString()
+            };
+          }),
+          
+          // Legacy format
+          statusBreakdown: statusCounts,
+          recentRequests,
+        };
+      } catch (error) {
+        // If error is with reference_links, try with a fallback query
+        console.error('Error in first attempt at custom design report:', error);
+        
+        // Fallback query without potentially problematic fields
+        const statusCounts = await db
+          .select({
+            status: customDesignRequests.status,
+            count: sql<number>`count(*)`,
+          })
+          .from(customDesignRequests)
+          .where(whereClause)
+          .groupBy(customDesignRequests.status);
+          
+        const customDesignsData = await db
+          .select({
+            id: customDesignRequests.designId,
+            customer_name: users.name,
+            customer_email: users.email,
+            status: customDesignRequests.status,
+            budget: customDesignRequests.budgetRange,
+            created_at: customDesignRequests.createdAt,
+          })
+          .from(customDesignRequests)
+          .innerJoin(users, eq(customDesignRequests.userId, users.id))
+          .where(whereClause)
+          .orderBy(desc(customDesignRequests.createdAt));
+          
+        const pendingRequests = statusCounts.find(s => s.status === 'pending')?.count || 0;
+        const approvedRequests = statusCounts.find(s => s.status === 'approved')?.count || 0;
+        const rejectedRequests = statusCounts.find(s => s.status === 'rejected')?.count || 0;
+        const totalRequests = statusCounts.reduce((sum, item) => sum + Number(item.count), 0);
+        
+        return {
+          totalRequests,
+          pendingRequests,
+          approvedRequests,
+          rejectedRequests,
+          customDesignsData: customDesignsData.map(item => ({
+            ...item,
+            id: Number(item.id),
+            description: 'No description available',
+            timeline: 'N/A',
+            reference_links: [],
+            budget: item.budget || '0',
+            customer_name: item.customer_name || 'Unknown'
+          })),
+          statusBreakdown: statusCounts,
+          recentRequests: [],
+        };
+      }
     } catch (error) {
       console.error('Error generating custom design report:', error);
       // Return a basic structure so the UI doesn't break

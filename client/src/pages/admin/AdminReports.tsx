@@ -42,7 +42,7 @@ const reportTypes = [
   { value: 'inventory', label: 'Inventory Report', description: 'Stock levels and product performance' },
   { value: 'customers', label: 'Customer Report', description: 'Customer analytics and behavior' },
   { value: 'products', label: 'Product Report', description: 'Product performance and popularity' },
-  { value: 'custom_designs', label: 'Custom Designs Report', description: 'Custom design requests and status' },
+  { value: 'customDesigns', label: 'Custom Designs Report', description: 'Custom design requests and status' },
 ];
 
 const dateRanges = [
@@ -158,6 +158,21 @@ export default function AdminReports() {
               console.log(`Normalizing ${data.customDesignsData.length} custom design requests`);
             }
             
+            // Helper to ensure a value is an array
+            const ensureArray = (val: any): any[] => {
+              if (Array.isArray(val)) return val;
+              if (val === null || val === undefined) return [];
+              if (typeof val === 'string') {
+                try {
+                  const parsed = JSON.parse(val);
+                  return Array.isArray(parsed) ? parsed : [val];
+                } catch {
+                  return [val];
+                }
+              }
+              return [val];
+            };
+            
             // Normalize custom design data
             data.customDesignsData = data.customDesignsData.map((item: any) => {
               // Print item details for debugging
@@ -171,7 +186,7 @@ export default function AdminReports() {
                 description: item.description || 'No description',
                 budget: typeof item.budget === 'string' ? item.budget : String(item.budget || '0'),
                 timeline: item.timeline || 'N/A',
-                reference_links: item.reference_links || '',
+                reference_links: ensureArray(item.reference_links),
                 created_at: item.created_at || null
               };
             });

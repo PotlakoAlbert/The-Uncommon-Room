@@ -40,10 +40,15 @@ function Router() {
   // Load server cart for authenticated users on app start
   // Only fetch if user is authenticated and cart is not already authenticated
   useEffect(() => {
-    if (isAuthenticated && !cartIsAuthenticated) {
+    const token = localStorage.getItem('token');
+    console.log('[App] Initial load - Auth status:', isAuthenticated, 'Cart auth status:', cartIsAuthenticated, 'Token exists:', !!token);
+    
+    if ((isAuthenticated || token) && !cartIsAuthenticated) {
+      console.log('[App] Fetching server cart on initialization');
       dispatch(fetchServerCart());
-    } else if (!isAuthenticated && cartIsAuthenticated) {
+    } else if (!isAuthenticated && !token && cartIsAuthenticated) {
       // Mark cart as unauthenticated when user logs out
+      console.log('[App] Marking cart as unauthenticated');
       dispatch(setCartAuthentication(false));
     }
   }, [isAuthenticated, cartIsAuthenticated, dispatch]);

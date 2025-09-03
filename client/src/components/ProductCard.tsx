@@ -31,7 +31,7 @@ export default function ProductCard({ product }: ProductCardProps) {
     try {
       if (isAuthenticated) {
         // User is logged in - sync with server
-        dispatch(addToServerCart({
+        void dispatch(addToServerCart({
           productId: product.prodId,
           quantity: 1,
         }));

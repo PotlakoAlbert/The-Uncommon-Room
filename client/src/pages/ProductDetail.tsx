@@ -34,17 +34,23 @@ export default function ProductDetail() {
     if (!product) return;
 
     try {
-      if (isAuthenticated) {
+      // Check authentication status and token
+      const token = localStorage.getItem('token');
+      console.log('[ProductDetail] Adding to cart, auth status:', isAuthenticated, 'token exists:', !!token);
+      
+      if (isAuthenticated && token) {
         // User is logged in - sync with server
-        dispatch(addToServerCart({
+        console.log('[ProductDetail] Using addToServerCart');
+        void dispatch(addToServerCart({
           productId: product.prodId,
           quantity,
           customNotes,
         }));
       } else {
         // User is not logged in - add to local cart
+        console.log('[ProductDetail] Using addToLocalCart');
         dispatch(addToLocalCart({
-          cartItemId: Date.now(),
+          cartItemId: Date.now() + Math.random(),
           prodId: product.prodId,
           name: product.name,
           price: product.price,

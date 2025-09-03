@@ -41,10 +41,17 @@ export default function Login() {
       return response.json();
     },
     onSuccess: (data) => {
+      // Store token first in localStorage
+      localStorage.setItem('token', data.accessToken);
+      localStorage.setItem('user', JSON.stringify(data.user || data.customer));
+      console.log('[Login] Token saved to localStorage:', data.accessToken.substring(0, 10) + '...');
+      
+      // Then dispatch to Redux store
       dispatch(loginSuccess({
         user: { ...(data.user || data.customer), type: 'customer' },
-        token: data.token,
+        token: data.accessToken,
       }));
+      
       // Sync cart after successful login
       dispatch(syncCartOnLogin());
       toast({

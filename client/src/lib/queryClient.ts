@@ -16,29 +16,54 @@ export async function apiRequest(
     throwOn401?: boolean; // Allow some requests to not throw on 401
   }
 ): Promise<Response> {
-  // Get the current token from the Redux store
+  // Get the current token from Redux store AND localStorage as backup
   const state = store.getState();
-  const token = state.auth.token;
+  let token = state.auth.token;
   
+  // If token is not in Redux store, try to get it from localStorage
+  if (!token) {
+    token = localStorage.getItem('token');
+    console.log('[apiRequest] Token from localStorage:', token ? 'present' : 'missing');
+  }
+  
+  const isCartEndpoint = url.includes('/api/cart');
+
   const headers: Record<string, string> = {};
-  
+
   // Add Content-Type for JSON requests with data (skip for FormData)
   const isFormData = typeof FormData !== 'undefined' && data instanceof FormData;
   if (data && !isFormData) {
     headers["Content-Type"] = "application/json";
   }
-  
-  // Add Authorization header if token exists
+
+  // Always send token if present, regardless of endpoint
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
+    if (isCartEndpoint) {
+      console.log('[apiRequest] Sending token for cart request');
+    }
+  } else {
+    if (isCartEndpoint) {
+      console.warn('[apiRequest] No token found for cart request');
+    }
   }
 
   const res = await fetch(url, {
-  method,
-  headers,
-  body: data ? (isFormData ? (data as FormData) : JSON.stringify(data)) : undefined,
+    method,
+    headers,
+    body: data ? (isFormData ? (data as FormData) : JSON.stringify(data)) : undefined,
     credentials: "include",
   });
+
+  // For cart endpoints, handle 401/403 gracefully
+  if (isCartEndpoint && (res.status === 401 || res.status === 403)) {
+    // Optionally, clear token and mark as unauthenticated
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    // Optionally, dispatch logout or show toast
+    // Return a dummy empty response or throw
+    return res;
+  }
 
   // Don't throw on 401 if explicitly requested (useful for cart requests)
   if (res.status === 401 && options?.throwOn401 === false) {

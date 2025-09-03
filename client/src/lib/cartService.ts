@@ -27,11 +27,18 @@ export class CartService {
   // Sync local cart with server cart on login
   static async syncCartOnLogin(localCartItems: LocalCartItem[]): Promise<LocalCartItem[]> {
     try {
+      console.log('[CartService] Beginning sync after login, local items:', localCartItems.length);
+      // Get token from localStorage directly to ensure it's available
+      const token = localStorage.getItem('token');
+      console.log('[CartService] Token available for sync:', token ? 'yes' : 'no');
+      
       // Get server cart to check if it exists
-  await apiRequest('GET', '/api/cart');
+      const cartResponse = await apiRequest('GET', '/api/cart');
+      console.log('[CartService] Server cart response status:', cartResponse.status);
       
       // If user has items in local cart, add them to server
       if (localCartItems.length > 0) {
+        console.log('[CartService] Syncing local items to server');
         for (const localItem of localCartItems) {
           await this.addToServerCart({
             productId: localItem.prodId,
@@ -61,8 +68,18 @@ export class CartService {
     customNotes?: string;
   }): Promise<void> {
     try {
-  // Server expects POST /api/cart with body { productId, quantity, customNotes }
-  await apiRequest('POST', '/api/cart', item);
+      // Get token directly from localStorage for this critical operation
+      const token = localStorage.getItem('token');
+      console.log('[CartService] Adding to cart, token available:', token ? 'yes' : 'no');
+      
+      // Server expects POST /api/cart with body { productId, quantity, customNotes }
+      const response = await apiRequest('POST', '/api/cart', item);
+      console.log('[CartService] Add to cart response status:', response.status);
+      
+      if (!response.ok) {
+        const text = await response.text();
+        console.error('[CartService] Add to cart failed:', response.status, text);
+      }
     } catch (error) {
       console.error('Failed to add item to server cart:', error);
       throw error;

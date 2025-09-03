@@ -57,9 +57,13 @@ export default function Checkout() {
       dispatch(clearCart());
       toast({
         title: "Order Placed Successfully!",
-        description: `Your order #UCR-${order.ordId} has been confirmed.`,
+        description: order?.ordId ? `Your order #UCR-${order.ordId} has been confirmed.` : "Your order has been confirmed.",
       });
-      setLocation(`/orders/${order.ordId}`);
+      if (order?.ordId) {
+        setLocation(`/orders/${order.ordId}`);
+      } else {
+        setLocation('/orders');
+      }
     },
     onError: (error: any) => {
       toast({

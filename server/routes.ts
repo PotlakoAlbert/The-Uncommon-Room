@@ -744,9 +744,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put('/api/admin/custom-designs/:id/status', authenticateToken, requireAdmin, async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
+      const idParam = req.params.id;
+      // Check if id is valid before parsing
+      if (!idParam || idParam === 'undefined' || idParam === 'null') {
+        return res.status(400).json({ message: 'Valid design ID is required' });
+      }
+      
+      const id = parseInt(idParam);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: 'Invalid design ID format' });
+      }
+      
       const { status, quoteAmount } = req.body as { status: string; quoteAmount?: string };
       if (!status) return res.status(400).json({ message: 'Status is required' });
+      
+      console.log('Updating custom design status:', { id, status, quoteAmount });
       const updated = await storage.updateCustomDesignStatus(id, status, quoteAmount);
       res.json(updated);
     } catch (error) {
@@ -853,7 +865,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Reports API
   app.get('/api/admin/reports', authenticateToken, requireAdmin, async (req, res) => {
     try {
+      console.log('Generating report with params:', req.query);
       const { type, range, startDate, endDate } = req.query;
+      
+      if (!type) {
+        return res.status(400).json({ message: 'Report type is required' });
+      }
       
       let reportData;
       let dateFilter = { startDate: undefined as string | undefined, endDate: undefined as string | undefined };
@@ -870,39 +887,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
         dateFilter.endDate = now.toISOString().split('T')[0];
       }
 
-      switch (type) {
-        case 'sales':
-          reportData = await storage.generateSalesReport(dateFilter.startDate, dateFilter.endDate);
-          break;
-        case 'inventory':
-          reportData = await storage.generateInventoryReport();
-          break;
-        case 'customers':
-          reportData = await storage.generateCustomerReport(dateFilter.startDate, dateFilter.endDate);
-          break;
-        case 'products':
-          reportData = await storage.generateProductReport(dateFilter.startDate, dateFilter.endDate);
-          break;
-        case 'custom_designs':
-          reportData = await storage.generateCustomDesignReport(dateFilter.startDate, dateFilter.endDate);
-          break;
-        default:
-          return res.status(400).json({ message: 'Invalid report type' });
+      console.log(`Generating ${type} report with date range:`, dateFilter);
+      
+      try {
+        switch (type) {
+          case 'sales':
+            reportData = await storage.generateSalesReport(dateFilter.startDate, dateFilter.endDate);
+            break;
+          case 'inventory':
+            reportData = await storage.generateInventoryReport();
+            break;
+          case 'customers':
+            reportData = await storage.generateCustomerReport(dateFilter.startDate, dateFilter.endDate);
+            break;
+          case 'products':
+            reportData = await storage.generateProductReport(dateFilter.startDate, dateFilter.endDate);
+            break;
+          case 'custom_designs':
+            reportData = await storage.generateCustomDesignReport(dateFilter.startDate, dateFilter.endDate);
+            break;
+          default:
+            return res.status(400).json({ message: `Invalid report type: ${type}` });
+        }
+      } catch (error) {
+        console.error(`Error generating ${type} report:`, error);
+        return res.status(500).json({ 
+          message: `Error generating ${type} report`, 
+          error: error instanceof Error ? error.message : 'Unknown error' 
+        });
       }
 
       // Add general stats to all reports
-      const dashboardStats = await storage.getDashboardStats();
-      reportData = {
-        ...reportData,
-        totalCustomers: dashboardStats.totalUsers,
-        totalProducts: dashboardStats.totalProducts,
-      };
+      try {
+        const dashboardStats = await storage.getDashboardStats();
+        reportData = {
+          ...reportData,
+          totalCustomers: dashboardStats.totalUsers,
+          totalProducts: dashboardStats.totalProducts,
+          generatedAt: new Date().toISOString(),
+        };
+      } catch (error) {
+        console.error('Error getting dashboard stats:', error);
+        // Continue without dashboard stats
+      }
 
-      console.log('Sending report data:', JSON.stringify(reportData, null, 2));
+      console.log(`Successfully generated ${type} report with ${reportData?.inventoryData?.length || 0} inventory items`);
       res.json(reportData);
     } catch (error) {
       console.error('Generate report error:', error);
-      res.status(500).json({ message: 'Failed to generate report' });
+      res.status(500).json({ 
+        message: 'Failed to generate report', 
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
     }
   });
 

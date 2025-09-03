@@ -63,7 +63,14 @@ export default function AdminCustomDesigns() {
   const updateDesignStatusMutation = useMutation({
     mutationFn: async ({ designId, status, quoteAmount }: { designId: number; status: string; quoteAmount?: string }) => {
       const payload: any = { status };
-      if (quoteAmount && quoteAmount !== '') payload.quoteAmount = quoteAmount;
+      if (quoteAmount && quoteAmount !== '') {
+        // Ensure quoteAmount is a valid number
+        const parsedAmount = parseFloat(quoteAmount);
+        if (!isNaN(parsedAmount)) {
+          payload.quoteAmount = parsedAmount.toString();
+        }
+      }
+      console.log('Updating design status:', { designId, payload });
       const response = await apiRequest('PUT', `/api/admin/custom-designs/${designId}/status`, payload);
       if (!response.ok) throw new Error('Failed to update design status');
       return response.json();
@@ -74,8 +81,10 @@ export default function AdminCustomDesigns() {
         title: "Design Status Updated",
         description: "The design status has been updated successfully.",
       });
+      setIsUpdateDialogOpen(false);
     },
     onError: (error: any) => {
+      console.error('Update error:', error);
       toast({
         title: "Failed to Update Status",
         description: error.message,
@@ -108,8 +117,17 @@ export default function AdminCustomDesigns() {
 
   const onSubmit = (data: UpdateDesignFormData) => {
     if (!selectedDesign) return;
+    const designId = selectedDesign.custom_design_requests.id || selectedDesign.custom_design_requests.designId;
+    if (!designId) {
+      toast({
+        title: "Error",
+        description: "Could not determine design ID",
+        variant: "destructive",
+      });
+      return;
+    }
     updateDesignStatusMutation.mutate({
-      designId: selectedDesign.custom_design_requests.designId,
+      designId,
       status: data.status,
       quoteAmount: data.quoteAmount,
     });
@@ -256,32 +274,35 @@ export default function AdminCustomDesigns() {
                     </tr>
                   </thead>
                   <tbody>
-                    {customDesigns.map((design: any) => (
-                      <tr key={design.custom_design_requests.designId} className="border-b border-border" data-testid={`design-row-${design.custom_design_requests.designId}`}>
-                        <td className="p-4" data-testid={`text-design-id-${design.custom_design_requests.designId}`}>
-                          #{design.custom_design_requests.designId}
+                    {customDesigns.map((design: any) => {
+                      // Use id as the primary identifier, fall back to designId if id is not available
+                      const designId = design.custom_design_requests.id || design.custom_design_requests.designId;
+                      return (
+                      <tr key={designId} className="border-b border-border" data-testid={`design-row-${designId}`}>
+                        <td className="p-4" data-testid={`text-design-id-${designId}`}>
+                          #{designId}
                         </td>
-                        <td className="p-4" data-testid={`text-design-customer-${design.custom_design_requests.designId}`}>
+                        <td className="p-4" data-testid={`text-design-customer-${designId}`}>
                           {design.users?.name || design.customers?.name || 'Unknown'}
                         </td>
-                        <td className="p-4 capitalize" data-testid={`text-design-type-${design.custom_design_requests.designId}`}>
+                        <td className="p-4 capitalize" data-testid={`text-design-type-${designId}`}>
                           {design.custom_design_requests.furnitureType}
                         </td>
-                        <td className="p-4" data-testid={`text-design-budget-${design.custom_design_requests.designId}`}>
+                        <td className="p-4" data-testid={`text-design-budget-${designId}`}>
                           {design.custom_design_requests.budgetRange || 'Not specified'}
                         </td>
                         <td className="p-4">
-                          <Badge className={`${getStatusColor(design.custom_design_requests.status)} text-xs`} data-testid={`badge-design-status-${design.custom_design_requests.designId}`}>
+                          <Badge className={`${getStatusColor(design.custom_design_requests.status)} text-xs`} data-testid={`badge-design-status-${designId}`}>
                             {getStatusLabel(design.custom_design_requests.status)}
                           </Badge>
                         </td>
-                        <td className="p-4" data-testid={`text-design-quote-${design.custom_design_requests.designId}`}>
+                        <td className="p-4" data-testid={`text-design-quote-${designId}`}>
                           {design.custom_design_requests.quoteAmount 
                             ? `R ${parseFloat(design.custom_design_requests.quoteAmount).toLocaleString()}`
                             : 'Not quoted'
                           }
                         </td>
-                        <td className="p-4" data-testid={`text-design-date-${design.custom_design_requests.designId}`}>
+                        <td className="p-4" data-testid={`text-design-date-${designId}`}>
                           {new Date(design.custom_design_requests.createdAt).toLocaleDateString()}
                         </td>
                         <td className="p-4">
@@ -290,7 +311,7 @@ export default function AdminCustomDesigns() {
                               variant="ghost" 
                               size="sm"
                               onClick={() => viewDesignDetails(design)}
-                              data-testid={`button-view-design-${design.custom_design_requests.designId}`}
+                              data-testid={`button-view-design-${designId}`}
                             >
                               <span className="material-icons text-sm">visibility</span>
                             </Button>
@@ -298,14 +319,15 @@ export default function AdminCustomDesigns() {
                               variant="outline" 
                               size="sm"
                               onClick={() => openUpdateDialog(design)}
-                              data-testid={`button-update-design-${design.custom_design_requests.designId}`}
+                              data-testid={`button-update-design-${designId}`}
                             >
                               <span className="material-icons text-sm">edit</span>
                             </Button>
                           </div>
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -328,7 +350,7 @@ export default function AdminCustomDesigns() {
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle data-testid="text-design-details-title">
-                Custom Design Request - #{selectedDesign?.custom_design_requests?.designId}
+                Custom Design Request - #{selectedDesign?.custom_design_requests?.id || selectedDesign?.custom_design_requests?.designId}
               </DialogTitle>
             </DialogHeader>
             
@@ -481,7 +503,7 @@ export default function AdminCustomDesigns() {
           <DialogContent>
             <DialogHeader>
               <DialogTitle data-testid="text-update-design-status-title">
-                Update Design Status - #{selectedDesign?.custom_design_requests?.designId}
+                Update Design Status - #{selectedDesign?.custom_design_requests?.id || selectedDesign?.custom_design_requests?.designId}
               </DialogTitle>
             </DialogHeader>
             

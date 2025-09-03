@@ -68,22 +68,91 @@ export default function AdminReports() {
     queryKey: ['/api/admin/reports', selectedReportType, selectedDateRange, customStartDate, customEndDate],
     enabled: false, // Don't auto-fetch, wait for manual trigger
     queryFn: async () => {
-      const params = new URLSearchParams({
-        type: selectedReportType,
-        range: selectedDateRange,
-      });
-      
-      if (selectedDateRange === 'custom' && customStartDate && customEndDate) {
-        params.append('startDate', customStartDate);
-        params.append('endDate', customEndDate);
+      try {
+        const params = new URLSearchParams({
+          type: selectedReportType,
+          range: selectedDateRange,
+        });
+        
+        if (selectedDateRange === 'custom' && customStartDate && customEndDate) {
+          params.append('startDate', customStartDate);
+          params.append('endDate', customEndDate);
+        }
+        
+        console.log(`Fetching report: ${selectedReportType} for range ${selectedDateRange}`);
+        const response = await apiRequest('GET', `/api/admin/reports?${params}`);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`Report API error (${response.status}):`, errorText);
+          throw new Error(`Failed to fetch report data: ${response.status} ${errorText}`);
+        }
+        
+        const data = await response.json();
+        console.log('Report data received:', data);
+        
+        // Normalize and sanitize data
+        const normalizeData = (data: any) => {
+          if (!data) return data;
+          
+          // Ensure specific report types have expected structure
+          if (selectedReportType === 'inventory') {
+            // Ensure inventoryData is an array
+            if (!data.inventoryData || !Array.isArray(data.inventoryData)) {
+              data.inventoryData = [];
+            }
+            
+            // Normalize each inventory item to ensure safe rendering
+            data.inventoryData = data.inventoryData.map((item: any) => ({
+              productId: item.productId || 0,
+              name: item.name || 'Unknown',
+              category: item.category || 'N/A',
+              price: typeof item.price === 'number' ? item.price : parseFloat(item.price) || 0,
+              quantity: typeof item.quantity === 'number' ? item.quantity : parseInt(item.quantity) || 0,
+              costPrice: item.costPrice || '0',
+              lastUpdated: item.lastUpdated || null
+            }));
+            
+            // Ensure other inventory fields
+            data.totalProducts = data.totalProducts || 0;
+            data.totalValue = data.totalValue || 0;
+            data.lowStockItems = data.lowStockItems || 0;
+            data.outOfStockItems = data.outOfStockItems || 0;
+          }
+          
+          if (selectedReportType === 'custom_designs') {
+            // Ensure arrays exist
+            data.statusBreakdown = Array.isArray(data.statusBreakdown) ? data.statusBreakdown : [];
+            data.recentRequests = Array.isArray(data.recentRequests) ? data.recentRequests : [];
+            
+            // Normalize each status breakdown item
+            data.statusBreakdown = data.statusBreakdown.map((item: any) => ({
+              status: item.status || 'unknown',
+              count: typeof item.count === 'number' ? item.count : parseInt(item.count) || 0
+            }));
+            
+            // Normalize each request
+            data.recentRequests = data.recentRequests.map((item: any) => ({
+              designId: item.designId || 0,
+              customerName: item.customerName || 'Unknown',
+              furnitureType: item.furnitureType || 'Unknown',
+              status: item.status || 'unknown',
+              quoteAmount: item.quoteAmount || null,
+              createdAt: item.createdAt || null
+            }));
+          }
+          
+          return data;
+        };
+        
+        return normalizeData(data);
+      } catch (error) {
+        console.error('Error fetching report:', error);
+        throw error;
       }
-      
-      const response = await apiRequest('GET', `/api/admin/reports?${params}`);
-      if (!response.ok) throw new Error('Failed to fetch report data');
-      const data = await response.json();
-      console.log('Report data received:', data);
-      return data;
     },
+    retry: 1,
+    retryDelay: 1000,
   });
 
   // Debug: Log reportData changes
@@ -98,16 +167,58 @@ export default function AdminReports() {
     try {
       const result = await refetch();
       console.log('Refetch result:', result);
-      console.log('Report data after refetch:', reportData);
-      toast({
-        title: "Report Generated",
-        description: "Your report has been generated successfully.",
-      });
+      
+      if (result.isError) {
+        throw result.error;
+      }
+      
+      // Sanitize data to prevent objects being rendered directly
+      if (result.data) {
+        // Process the data to ensure all values are renderable
+        const sanitizeData = (obj: any) => {
+          if (!obj) return obj;
+          
+          Object.keys(obj).forEach(key => {
+            const value = obj[key];
+            
+            // Check if the value is an object but not an array and not null
+            if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+              // If it's a Date object, keep it
+              if (value instanceof Date) {
+                obj[key] = value;
+              } else {
+                // For other objects that might be incorrectly rendered, convert to string
+                try {
+                  obj[key] = JSON.stringify(value);
+                } catch (e) {
+                  obj[key] = `[Object]`;
+                }
+              }
+            }
+          });
+        };
+        
+        // Apply sanitization to top-level properties
+        sanitizeData(result.data);
+      }
+      
+      if (selectedReportType === 'inventory' && (!result.data?.inventoryData || result.data.inventoryData.length === 0)) {
+        console.warn('No inventory data returned');
+        toast({
+          title: "Report Generated",
+          description: "The inventory report was generated but no inventory data was found.",
+        });
+      } else {
+        toast({
+          title: "Report Generated",
+          description: "Your report has been generated successfully.",
+        });
+      }
     } catch (error: any) {
       console.error('Report generation error:', error);
       toast({
         title: "Report Generation Failed",
-        description: error.message,
+        description: error?.message || "Failed to generate report. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -116,6 +227,11 @@ export default function AdminReports() {
   };
 
   const exportReport = async (format: 'pdf' | 'csv' | 'excel') => {
+    const exportingToast = toast({
+      title: "Exporting Report",
+      description: `Preparing ${selectedReportType} report for download...`,
+    });
+    
     try {
       const params = new URLSearchParams({
         type: selectedReportType,
@@ -128,11 +244,26 @@ export default function AdminReports() {
         params.append('endDate', customEndDate);
       }
       
+      console.log(`Exporting ${selectedReportType} report as ${format}`);
       const response = await apiRequest('GET', `/api/admin/reports/export?${params}`);
-      if (!response.ok) throw new Error('Failed to export report');
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Export error (${response.status}):`, errorText);
+        throw new Error(`Failed to export report: ${response.status} ${errorText}`);
+      }
       
       // Create download link
       const blob = await response.blob();
+      if (blob.size < 100) {
+        // If the file is too small, it might be an error
+        const text = await blob.text();
+        console.warn('Export returned a very small file, checking content:', text);
+        if (text.includes('error') || text.includes('fail')) {
+          throw new Error(`Export failed: ${text}`);
+        }
+      }
+      
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -147,11 +278,14 @@ export default function AdminReports() {
         description: `Report exported as ${format.toUpperCase()} successfully.`,
       });
     } catch (error: any) {
+      console.error('Export error:', error);
       toast({
         title: "Export Failed",
-        description: error.message,
+        description: error?.message || "Failed to export report. Please try again.",
         variant: "destructive",
       });
+    } finally {
+      toast.dismiss(exportingToast);
     }
   };
 
@@ -522,7 +656,7 @@ export default function AdminReports() {
             )}
 
             {/* Inventory Report */}
-            {selectedReportType === 'inventory' && reportData.inventoryData && (
+            {selectedReportType === 'inventory' && (
               <>
                 <Card className="material-shadow">
                   <CardHeader>
@@ -532,55 +666,90 @@ export default function AdminReports() {
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                       <div className="p-4 border rounded-lg">
                         <p className="text-sm text-muted-foreground">Total Products</p>
-                        <p className="text-2xl font-bold">{reportData.totalProducts}</p>
+                        <p className="text-2xl font-bold">{reportData?.totalProducts || 0}</p>
                       </div>
                       <div className="p-4 border rounded-lg">
                         <p className="text-sm text-muted-foreground">Total Value</p>
-                        <p className="text-2xl font-bold">R {reportData.totalValue?.toLocaleString?.() || reportData.totalValue}</p>
+                        <p className="text-2xl font-bold">
+                          R {reportData?.totalValue ? 
+                            (typeof reportData.totalValue === 'number' ? 
+                              reportData.totalValue.toLocaleString() : 
+                              typeof reportData.totalValue === 'string' ?
+                                reportData.totalValue : 
+                                JSON.stringify(reportData.totalValue)) : 
+                            '0'}
+                        </p>
                       </div>
                       <div className="p-4 border rounded-lg">
                         <p className="text-sm text-muted-foreground">Low Stock Items</p>
-                        <p className="text-2xl font-bold text-yellow-600">{reportData.lowStockItems}</p>
+                        <p className="text-2xl font-bold text-yellow-600">{reportData?.lowStockItems || 0}</p>
                       </div>
                       <div className="p-4 border rounded-lg">
                         <p className="text-sm text-muted-foreground">Out of Stock</p>
-                        <p className="text-2xl font-bold text-red-600">{reportData.outOfStockItems}</p>
+                        <p className="text-2xl font-bold text-red-600">{reportData?.outOfStockItems || 0}</p>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
 
-                <Card className="material-shadow">
-                  <CardHeader>
-                    <CardTitle>Inventory Details</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead className="bg-muted">
-                          <tr>
-                            <th className="text-left p-3">Product</th>
-                            <th className="text-left p-3">Category</th>
-                            <th className="text-left p-3">Price</th>
-                            <th className="text-left p-3">Qty</th>
-                            <th className="text-left p-3">Last Updated</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {reportData.inventoryData.map((row: any) => (
-                            <tr key={row.productId} className="border-b border-border">
-                              <td className="p-3">{row.name}</td>
-                              <td className="p-3 capitalize">{row.category}</td>
-                              <td className="p-3">R {parseFloat(row.price).toLocaleString()}</td>
-                              <td className="p-3">{row.quantity}</td>
-                              <td className="p-3">{row.lastUpdated ? new Date(row.lastUpdated).toLocaleString() : '-'}</td>
+                {reportData?.inventoryData?.length > 0 ? (
+                  <Card className="material-shadow">
+                    <CardHeader>
+                      <CardTitle>Inventory Details</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead className="bg-muted">
+                            <tr>
+                              <th className="text-left p-3">Product</th>
+                              <th className="text-left p-3">Category</th>
+                              <th className="text-left p-3">Price</th>
+                              <th className="text-left p-3">Qty</th>
+                              <th className="text-left p-3">Last Updated</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </CardContent>
-                </Card>
+                          </thead>
+                          <tbody>
+                            {reportData.inventoryData.map((row: any, index: number) => (
+                              <tr key={row.productId || index} className="border-b border-border">
+                                <td className="p-3">{typeof row.name === 'string' ? row.name : 'Unknown'}</td>
+                                <td className="p-3 capitalize">{typeof row.category === 'string' ? row.category : 'N/A'}</td>
+                                <td className="p-3">
+                                  R {(() => {
+                                    if (!row.price) return '0';
+                                    if (typeof row.price === 'number') return row.price.toLocaleString();
+                                    if (typeof row.price === 'string') {
+                                      const parsedPrice = parseFloat(row.price);
+                                      return !isNaN(parsedPrice) ? parsedPrice.toLocaleString() : '0';
+                                    }
+                                    return '0';
+                                  })()}
+                                </td>
+                                <td className="p-3">{typeof row.quantity === 'number' ? row.quantity : (parseInt(String(row.quantity)) || 0)}</td>
+                                <td className="p-3">{row.lastUpdated ? 
+                                    (row.lastUpdated instanceof Date ? 
+                                      row.lastUpdated.toLocaleString() : 
+                                      new Date(row.lastUpdated).toLocaleString()) 
+                                    : '-'}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <Card className="material-shadow">
+                    <CardContent className="py-12 text-center">
+                      <div className="material-icons text-6xl text-muted-foreground mb-4">inventory_2</div>
+                      <h3 className="text-xl font-medium mb-2">No Inventory Data</h3>
+                      <p className="text-muted-foreground">
+                        There are no products in the inventory or data could not be retrieved.
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
               </>
             )}
 
@@ -664,10 +833,10 @@ export default function AdminReports() {
                     </CardHeader>
                     <CardContent>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {reportData.statusBreakdown.map((s: any) => (
-                          <div key={s.status} className="p-4 border rounded-lg">
-                            <p className="text-sm text-muted-foreground capitalize">{s.status}</p>
-                            <p className="text-2xl font-bold">{s.count}</p>
+                        {reportData.statusBreakdown.map((s: any, index: number) => (
+                          <div key={s.status || index} className="p-4 border rounded-lg">
+                            <p className="text-sm text-muted-foreground capitalize">{typeof s.status === 'string' ? s.status : 'unknown'}</p>
+                            <p className="text-2xl font-bold">{typeof s.count === 'number' ? s.count : (parseInt(String(s.count)) || 0)}</p>
                           </div>
                         ))}
                       </div>
@@ -693,13 +862,35 @@ export default function AdminReports() {
                             </tr>
                           </thead>
                           <tbody>
-                            {reportData.recentRequests.map((r: any) => (
-                              <tr key={r.designId} className="border-b border-border">
-                                <td className="p-3">{r.customerName}</td>
-                                <td className="p-3">{r.furnitureType}</td>
-                                <td className="p-3 capitalize">{r.status}</td>
-                                <td className="p-3">{r.quoteAmount ? `R ${parseFloat(r.quoteAmount).toLocaleString()}` : '-'}</td>
-                                <td className="p-3">{r.createdAt ? new Date(r.createdAt).toLocaleString() : '-'}</td>
+                            {reportData.recentRequests.map((r: any, index: number) => (
+                              <tr key={r.designId || index} className="border-b border-border">
+                                <td className="p-3">{typeof r.customerName === 'string' ? r.customerName : 'Unknown'}</td>
+                                <td className="p-3">{typeof r.furnitureType === 'string' ? r.furnitureType : 'Unknown'}</td>
+                                <td className="p-3 capitalize">{typeof r.status === 'string' ? r.status : 'unknown'}</td>
+                                <td className="p-3">
+                                  {r.quoteAmount ? 
+                                    `R ${(() => {
+                                      if (typeof r.quoteAmount === 'number') return r.quoteAmount.toLocaleString();
+                                      try {
+                                        const parsed = parseFloat(r.quoteAmount);
+                                        return !isNaN(parsed) ? parsed.toLocaleString() : '0';
+                                      } catch {
+                                        return '0';
+                                      }
+                                    })()}` 
+                                    : '-'}
+                                </td>
+                                <td className="p-3">
+                                  {r.createdAt ? 
+                                    (() => {
+                                      try {
+                                        return new Date(r.createdAt).toLocaleString();
+                                      } catch {
+                                        return '-';
+                                      }
+                                    })() 
+                                    : '-'}
+                                </td>
                               </tr>
                             ))}
                           </tbody>

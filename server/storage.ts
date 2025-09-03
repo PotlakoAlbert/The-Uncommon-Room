@@ -481,16 +481,27 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateCustomDesignStatus(id: number, status: string, quoteAmount?: string): Promise<CustomDesignRequest> {
+    if (isNaN(id)) {
+      throw new Error(`Invalid design ID: ${id}`);
+    }
+    
     const updateData: any = { status: status as any, updatedAt: new Date() };
-    if (quoteAmount) {
-      updateData.quoteAmount = quoteAmount;
+    
+    if (quoteAmount && quoteAmount.trim() !== '') {
+      const parsedAmount = parseFloat(quoteAmount);
+      if (!isNaN(parsedAmount)) {
+        updateData.quoteAmount = parsedAmount.toString();
+      }
     }
 
+    console.log(`Updating custom design ${id} with data:`, updateData);
+    
     const [updatedRequest] = await db
       .update(customDesignRequests)
       .set(updateData)
       .where(eq(customDesignRequests.id, id))
       .returning();
+      
     return updatedRequest;
   }
 
@@ -624,32 +635,103 @@ export class DatabaseStorage implements IStorage {
   }
 
   async generateInventoryReport(): Promise<any> {
-    const inventoryData = await db
-      .select({
-        productId: products.prodId,
-        name: products.name,
-        category: products.category,
-        price: products.price,
-        quantity: inventory.quantity,
-        costPrice: inventory.costPrice,
-        lastUpdated: inventory.lastUpdated,
-      })
-      .from(inventory)
-      .innerJoin(products, eq(inventory.productId, products.prodId))
-      .orderBy(products.name);
+    try {
+      console.log('Generating inventory report...');
+      
+      // First check if we have any inventory records
+      const inventoryCount = await db
+        .select({ count: sql`count(*)` })
+        .from(inventory)
+        .then(result => Number(result[0].count));
+        
+      console.log(`Found ${inventoryCount} inventory records`);
+      
+      if (inventoryCount === 0) {
+        // If no inventory records, fetch just products as placeholders
+        const productsData = await db
+          .select({
+            productId: products.prodId,
+            name: products.name,
+            category: products.category,
+            price: products.price,
+          })
+          .from(products)
+          .where(eq(products.active, true))
+          .orderBy(products.name);
+          
+        console.log(`Using ${productsData.length} products as placeholders for inventory`);
+        
+        const inventoryData = productsData.map(product => ({
+          ...product,
+          quantity: 0,
+          costPrice: "0.00",
+          lastUpdated: null
+        }));
+        
+        return {
+          totalProducts: inventoryData.length,
+          totalValue: 0,
+          lowStockItems: inventoryData.length,
+          outOfStockItems: inventoryData.length,
+          inventoryData,
+          lowStockItems: inventoryData,
+          outOfStockItems: inventoryData,
+        };
+      }
+      
+      // Normal flow with inventory records
+      const inventoryData = await db
+        .select({
+          productId: products.prodId,
+          name: products.name,
+          category: products.category,
+          price: products.price,
+          quantity: inventory.quantity,
+          costPrice: inventory.costPrice,
+          lastUpdated: inventory.lastUpdated,
+        })
+        .from(inventory)
+        .innerJoin(products, eq(inventory.productId, products.prodId))
+        .orderBy(products.name);
 
-    const lowStockItems = inventoryData.filter(item => item.quantity <= 5);
-    const outOfStockItems = inventoryData.filter(item => item.quantity === 0);
+      console.log(`Successfully retrieved ${inventoryData.length} inventory items`);
 
-    return {
-      totalProducts: inventoryData.length,
-      totalValue: inventoryData.reduce((sum, item) => sum + (parseFloat(item.price) * item.quantity), 0),
-      lowStockItems: lowStockItems.length,
-      outOfStockItems: outOfStockItems.length,
-      inventoryData,
-      lowStockItems,
-      outOfStockItems,
-    };
+      // Ensure inventory quantities are numbers
+      const normalizedInventory = inventoryData.map(item => ({
+        ...item,
+        quantity: typeof item.quantity === 'number' ? item.quantity : parseInt(item.quantity as any) || 0,
+        price: typeof item.price === 'string' ? parseFloat(item.price) : item.price
+      }));
+
+      const lowStockItems = normalizedInventory.filter(item => item.quantity <= 5 && item.quantity > 0);
+      const outOfStockItems = normalizedInventory.filter(item => item.quantity === 0);
+
+      const totalValue = normalizedInventory.reduce((sum, item) => {
+        const price = typeof item.price === 'string' ? parseFloat(item.price) : item.price;
+        return sum + (price * item.quantity);
+      }, 0);
+
+      return {
+        totalProducts: normalizedInventory.length,
+        totalValue: totalValue.toFixed(2),
+        lowStockItems: lowStockItems.length,
+        outOfStockItems: outOfStockItems.length,
+        inventoryData: normalizedInventory,
+        lowStockItems,
+        outOfStockItems,
+      };
+    } catch (error) {
+      console.error('Error generating inventory report:', error);
+      // Return a basic structure so the UI doesn't break
+      return {
+        totalProducts: 0,
+        totalValue: 0,
+        lowStockItems: 0,
+        outOfStockItems: 0,
+        inventoryData: [],
+        error: error instanceof Error ? error.message : 'Unknown error generating inventory report'
+      };
+    }
   }
 
   async generateCustomerReport(startDate?: string, endDate?: string): Promise<any> {

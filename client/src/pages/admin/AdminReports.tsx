@@ -95,32 +95,116 @@ export default function AdminReports() {
         const normalizeData = (data: any) => {
           if (!data) return data;
           
+          // Convert any string numbers to actual numbers
+          const parseNumericField = (value: any) => {
+            if (value === null || value === undefined) return 0;
+            if (typeof value === 'number') return value;
+            if (typeof value === 'string') {
+              const parsed = parseFloat(value);
+              return !isNaN(parsed) ? parsed : 0;
+            }
+            return 0;
+          };
+          
           // Ensure specific report types have expected structure
           if (selectedReportType === 'inventory') {
+            console.log('Normalizing inventory data...');
+            
+            // Convert string numbers to actual numbers at top level
+            data.totalProducts = parseNumericField(data.totalProducts);
+            data.totalValue = parseNumericField(data.totalValue);
+            data.lowStockItems = parseNumericField(data.lowStockItems);
+            data.outOfStockItems = parseNumericField(data.outOfStockItems);
+            
             // Ensure inventoryData is an array
             if (!data.inventoryData || !Array.isArray(data.inventoryData)) {
+              console.warn('inventoryData is not an array, initializing empty array');
               data.inventoryData = [];
+            } else {
+              console.log(`Normalizing ${data.inventoryData.length} inventory items`);
             }
             
             // Normalize each inventory item to ensure safe rendering
-            data.inventoryData = data.inventoryData.map((item: any) => ({
-              productId: item.productId || 0,
-              name: item.name || 'Unknown',
-              category: item.category || 'N/A',
-              price: typeof item.price === 'number' ? item.price : parseFloat(item.price) || 0,
-              quantity: typeof item.quantity === 'number' ? item.quantity : parseInt(item.quantity) || 0,
-              costPrice: item.costPrice || '0',
-              lastUpdated: item.lastUpdated || null
-            }));
+            data.inventoryData = data.inventoryData.map((item: any) => {
+              // Print item details for debugging
+              console.log('Original inventory item:', JSON.stringify(item));
+              
+              return {
+                productId: parseNumericField(item.productId),
+                name: item.name || 'Unknown',
+                category: item.category || 'N/A',
+                price: parseNumericField(item.price),
+                quantity: parseNumericField(item.quantity),
+                costPrice: item.costPrice || '0',
+                lastUpdated: item.lastUpdated || null
+              };
+            });
+          }
+          
+          if (selectedReportType === 'customDesigns') {
+            console.log('Normalizing custom designs data...');
             
-            // Ensure other inventory fields
-            data.totalProducts = data.totalProducts || 0;
-            data.totalValue = data.totalValue || 0;
-            data.lowStockItems = data.lowStockItems || 0;
-            data.outOfStockItems = data.outOfStockItems || 0;
+            // Convert string numbers to actual numbers at top level
+            data.totalRequests = parseNumericField(data.totalRequests);
+            data.pendingRequests = parseNumericField(data.pendingRequests);
+            data.approvedRequests = parseNumericField(data.approvedRequests);
+            data.rejectedRequests = parseNumericField(data.rejectedRequests);
+            
+            // Ensure customDesignsData is an array
+            if (!data.customDesignsData || !Array.isArray(data.customDesignsData)) {
+              console.warn('customDesignsData is not an array, initializing empty array');
+              data.customDesignsData = [];
+            } else {
+              console.log(`Normalizing ${data.customDesignsData.length} custom design requests`);
+            }
+            
+            // Normalize custom design data
+            data.customDesignsData = data.customDesignsData.map((item: any) => {
+              // Print item details for debugging
+              console.log('Original custom design item:', JSON.stringify(item));
+              
+              return {
+                id: parseNumericField(item.id),
+                customer_name: item.customer_name || 'Unknown',
+                customer_email: item.customer_email || 'No email provided',
+                status: item.status || 'Pending',
+                description: item.description || 'No description',
+                budget: typeof item.budget === 'string' ? item.budget : String(item.budget || '0'),
+                timeline: item.timeline || 'N/A',
+                reference_links: item.reference_links || '',
+                created_at: item.created_at || null
+              };
+            });
+            
+            // If old format exists, still normalize it for backward compatibility
+            if (data.statusBreakdown || data.recentRequests) {
+              console.log('Also found old format custom designs data, normalizing...');
+              
+              // Ensure arrays exist
+              data.statusBreakdown = Array.isArray(data.statusBreakdown) ? data.statusBreakdown : [];
+              data.recentRequests = Array.isArray(data.recentRequests) ? data.recentRequests : [];
+              
+              // Normalize each status breakdown item
+              data.statusBreakdown = data.statusBreakdown.map((item: any) => ({
+                status: item.status || 'unknown',
+                count: parseNumericField(item.count)
+              }));
+              
+              // Normalize each request
+              data.recentRequests = data.recentRequests.map((item: any) => ({
+                designId: parseNumericField(item.designId),
+                customerName: item.customerName || 'Unknown',
+                furnitureType: item.furnitureType || 'Unknown',
+                status: item.status || 'unknown',
+                quoteAmount: item.quoteAmount ? parseNumericField(item.quoteAmount) : null,
+                createdAt: item.createdAt || null
+              }));
+            }
           }
           
           if (selectedReportType === 'custom_designs') {
+            console.log('Normalizing legacy custom_designs data...');
+            
             // Ensure arrays exist
             data.statusBreakdown = Array.isArray(data.statusBreakdown) ? data.statusBreakdown : [];
             data.recentRequests = Array.isArray(data.recentRequests) ? data.recentRequests : [];
@@ -128,16 +212,16 @@ export default function AdminReports() {
             // Normalize each status breakdown item
             data.statusBreakdown = data.statusBreakdown.map((item: any) => ({
               status: item.status || 'unknown',
-              count: typeof item.count === 'number' ? item.count : parseInt(item.count) || 0
+              count: parseNumericField(item.count)
             }));
             
             // Normalize each request
             data.recentRequests = data.recentRequests.map((item: any) => ({
-              designId: item.designId || 0,
+              designId: parseNumericField(item.designId),
               customerName: item.customerName || 'Unknown',
               furnitureType: item.furnitureType || 'Unknown',
               status: item.status || 'unknown',
-              quoteAmount: item.quoteAmount || null,
+              quoteAmount: item.quoteAmount ? parseNumericField(item.quoteAmount) : null,
               createdAt: item.createdAt || null
             }));
           }
@@ -155,12 +239,53 @@ export default function AdminReports() {
     retryDelay: 1000,
   });
 
-  // Debug: Log reportData changes
+  // Debug: Log reportData changes with detailed analysis
   useEffect(() => {
     console.log('Report data changed:', reportData);
     console.log('Is loading:', isLoading);
     console.log('Error:', error);
-  }, [reportData, isLoading, error]);
+    
+    // Add enhanced debugging for report data
+    if (reportData) {
+      console.log('Report type:', selectedReportType);
+      
+      // Debug inventory data
+      if (selectedReportType === 'inventory') {
+        console.log('Inventory data analysis:');
+        console.log('- totalProducts:', typeof reportData.totalProducts, reportData.totalProducts);
+        console.log('- totalValue:', typeof reportData.totalValue, reportData.totalValue);
+        console.log('- lowStockItems:', typeof reportData.lowStockItems, reportData.lowStockItems);
+        console.log('- outOfStockItems:', typeof reportData.outOfStockItems, reportData.outOfStockItems);
+        
+        if (reportData.inventoryData && Array.isArray(reportData.inventoryData)) {
+          console.log('- inventoryData count:', reportData.inventoryData.length);
+          if (reportData.inventoryData.length > 0) {
+            console.log('- First inventory item:', reportData.inventoryData[0]);
+          }
+        } else {
+          console.warn('- inventoryData is not an array or is missing');
+        }
+      }
+      
+      // Debug custom designs data
+      if (selectedReportType === 'customDesigns') {
+        console.log('Custom designs data analysis:');
+        console.log('- totalRequests:', typeof reportData.totalRequests, reportData.totalRequests);
+        console.log('- pendingRequests:', typeof reportData.pendingRequests, reportData.pendingRequests);
+        console.log('- approvedRequests:', typeof reportData.approvedRequests, reportData.approvedRequests);
+        console.log('- rejectedRequests:', typeof reportData.rejectedRequests, reportData.rejectedRequests);
+        
+        if (reportData.customDesignsData && Array.isArray(reportData.customDesignsData)) {
+          console.log('- customDesignsData count:', reportData.customDesignsData.length);
+          if (reportData.customDesignsData.length > 0) {
+            console.log('- First custom design item:', reportData.customDesignsData[0]);
+          }
+        } else {
+          console.warn('- customDesignsData is not an array or is missing');
+        }
+      }
+    }
+  }, [reportData, isLoading, error, selectedReportType]);
 
   const generateReport = async () => {
     setIsGenerating(true);
@@ -666,27 +791,67 @@ export default function AdminReports() {
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                       <div className="p-4 border rounded-lg">
                         <p className="text-sm text-muted-foreground">Total Products</p>
-                        <p className="text-2xl font-bold">{reportData?.totalProducts || 0}</p>
+                        <p className="text-2xl font-bold">
+                          {(() => {
+                            // Ensure totalProducts is safely rendered as a number
+                            if (reportData?.totalProducts === undefined || reportData?.totalProducts === null) return '0';
+                            if (typeof reportData.totalProducts === 'number') return reportData.totalProducts.toLocaleString();
+                            try {
+                              const value = parseFloat(String(reportData.totalProducts));
+                              return !isNaN(value) ? value.toLocaleString() : '0';
+                            } catch {
+                              return '0';
+                            }
+                          })()}
+                        </p>
                       </div>
                       <div className="p-4 border rounded-lg">
                         <p className="text-sm text-muted-foreground">Total Value</p>
                         <p className="text-2xl font-bold">
-                          R {reportData?.totalValue ? 
-                            (typeof reportData.totalValue === 'number' ? 
-                              reportData.totalValue.toLocaleString() : 
-                              typeof reportData.totalValue === 'string' ?
-                                reportData.totalValue : 
-                                JSON.stringify(reportData.totalValue)) : 
-                            '0'}
+                          R {(() => {
+                            // Ensure totalValue is safely rendered as a currency number
+                            if (reportData?.totalValue === undefined || reportData?.totalValue === null) return '0';
+                            if (typeof reportData.totalValue === 'number') return reportData.totalValue.toLocaleString();
+                            try {
+                              const value = parseFloat(String(reportData.totalValue));
+                              return !isNaN(value) ? value.toLocaleString() : '0';
+                            } catch {
+                              return '0';
+                            }
+                          })()}
                         </p>
                       </div>
                       <div className="p-4 border rounded-lg">
                         <p className="text-sm text-muted-foreground">Low Stock Items</p>
-                        <p className="text-2xl font-bold text-yellow-600">{reportData?.lowStockItems || 0}</p>
+                        <p className="text-2xl font-bold text-yellow-600">
+                          {(() => {
+                            // Ensure lowStockItems is safely rendered as a number
+                            if (reportData?.lowStockItems === undefined || reportData?.lowStockItems === null) return '0';
+                            if (typeof reportData.lowStockItems === 'number') return reportData.lowStockItems.toLocaleString();
+                            try {
+                              const value = parseFloat(String(reportData.lowStockItems));
+                              return !isNaN(value) ? value.toLocaleString() : '0';
+                            } catch {
+                              return '0';
+                            }
+                          })()}
+                        </p>
                       </div>
                       <div className="p-4 border rounded-lg">
                         <p className="text-sm text-muted-foreground">Out of Stock</p>
-                        <p className="text-2xl font-bold text-red-600">{reportData?.outOfStockItems || 0}</p>
+                        <p className="text-2xl font-bold text-red-600">
+                          {(() => {
+                            // Ensure outOfStockItems is safely rendered as a number
+                            if (reportData?.outOfStockItems === undefined || reportData?.outOfStockItems === null) return '0';
+                            if (typeof reportData.outOfStockItems === 'number') return reportData.outOfStockItems.toLocaleString();
+                            try {
+                              const value = parseFloat(String(reportData.outOfStockItems));
+                              return !isNaN(value) ? value.toLocaleString() : '0';
+                            } catch {
+                              return '0';
+                            }
+                          })()}
+                        </p>
                       </div>
                     </div>
                   </CardContent>
@@ -716,21 +881,48 @@ export default function AdminReports() {
                                 <td className="p-3 capitalize">{typeof row.category === 'string' ? row.category : 'N/A'}</td>
                                 <td className="p-3">
                                   R {(() => {
-                                    if (!row.price) return '0';
-                                    if (typeof row.price === 'number') return row.price.toLocaleString();
-                                    if (typeof row.price === 'string') {
-                                      const parsedPrice = parseFloat(row.price);
-                                      return !isNaN(parsedPrice) ? parsedPrice.toLocaleString() : '0';
+                                    try {
+                                      if (!row.price) return '0';
+                                      if (typeof row.price === 'number') return row.price.toLocaleString();
+                                      if (typeof row.price === 'string') {
+                                        const parsedPrice = parseFloat(row.price);
+                                        return !isNaN(parsedPrice) ? parsedPrice.toLocaleString() : '0';
+                                      }
+                                      return '0';
+                                    } catch (e) {
+                                      console.error('Error formatting price:', e);
+                                      return '0';
                                     }
-                                    return '0';
                                   })()}
                                 </td>
-                                <td className="p-3">{typeof row.quantity === 'number' ? row.quantity : (parseInt(String(row.quantity)) || 0)}</td>
-                                <td className="p-3">{row.lastUpdated ? 
-                                    (row.lastUpdated instanceof Date ? 
-                                      row.lastUpdated.toLocaleString() : 
-                                      new Date(row.lastUpdated).toLocaleString()) 
-                                    : '-'}
+                                <td className="p-3">
+                                  {(() => {
+                                    try {
+                                      if (typeof row.quantity === 'number') return row.quantity.toLocaleString();
+                                      if (typeof row.quantity === 'string') {
+                                        const parsed = parseInt(row.quantity);
+                                        return !isNaN(parsed) ? parsed.toLocaleString() : '0';
+                                      }
+                                      return '0';
+                                    } catch (e) {
+                                      console.error('Error formatting quantity:', e);
+                                      return '0';
+                                    }
+                                  })()}
+                                </td>
+                                <td className="p-3">
+                                  {(() => {
+                                    try {
+                                      if (!row.lastUpdated) return '-';
+                                      if (row.lastUpdated instanceof Date) {
+                                        return row.lastUpdated.toLocaleString();
+                                      }
+                                      return new Date(String(row.lastUpdated)).toLocaleString();
+                                    } catch (e) {
+                                      console.error('Error formatting date:', e);
+                                      return '-';
+                                    }
+                                  })()}
                                 </td>
                               </tr>
                             ))}
@@ -823,7 +1015,82 @@ export default function AdminReports() {
               </Card>
             )}
 
-            {/* Custom Designs Report */}
+            {/* Custom Designs Report - New Format */}
+            {selectedReportType === 'customDesigns' && reportData.customDesignsData && (
+              <>
+                <Card className="material-shadow">
+                  <CardHeader>
+                    <CardTitle>Custom Design Requests Summary</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <div className="p-4 border rounded-lg">
+                        <p className="text-sm text-muted-foreground">Total Requests</p>
+                        <p className="text-2xl font-bold">{reportData.totalRequests || 0}</p>
+                      </div>
+                      <div className="p-4 border rounded-lg">
+                        <p className="text-sm text-muted-foreground">Pending</p>
+                        <p className="text-2xl font-bold">{reportData.pendingRequests || 0}</p>
+                      </div>
+                      <div className="p-4 border rounded-lg">
+                        <p className="text-sm text-muted-foreground">Approved</p>
+                        <p className="text-2xl font-bold">{reportData.approvedRequests || 0}</p>
+                      </div>
+                      <div className="p-4 border rounded-lg">
+                        <p className="text-sm text-muted-foreground">Rejected</p>
+                        <p className="text-2xl font-bold">{reportData.rejectedRequests || 0}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="material-shadow">
+                  <CardHeader>
+                    <CardTitle>Custom Design Requests</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead className="bg-muted">
+                          <tr>
+                            <th className="text-left p-3">ID</th>
+                            <th className="text-left p-3">Customer</th>
+                            <th className="text-left p-3">Status</th>
+                            <th className="text-left p-3">Budget</th>
+                            <th className="text-left p-3">Timeline</th>
+                            <th className="text-left p-3">Date</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {reportData.customDesignsData.map((item: any, index: number) => (
+                            <tr key={item.id || index} className="border-b border-border">
+                              <td className="p-3">{item.id || 'N/A'}</td>
+                              <td className="p-3">{typeof item.customer_name === 'string' ? item.customer_name : 'Unknown'}</td>
+                              <td className="p-3 capitalize">{typeof item.status === 'string' ? item.status : 'pending'}</td>
+                              <td className="p-3">{typeof item.budget === 'string' ? item.budget : String(item.budget || '0')}</td>
+                              <td className="p-3">{typeof item.timeline === 'string' ? item.timeline : 'N/A'}</td>
+                              <td className="p-3">
+                                {item.created_at ? 
+                                  (() => {
+                                    try {
+                                      return new Date(item.created_at).toLocaleString();
+                                    } catch {
+                                      return '-';
+                                    }
+                                  })() 
+                                  : '-'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </CardContent>
+                </Card>
+              </>
+            )}
+
+            {/* Custom Designs Report - Old Format */}
             {selectedReportType === 'custom_designs' && (reportData.statusBreakdown || reportData.recentRequests) && (
               <>
                 {reportData.statusBreakdown && (

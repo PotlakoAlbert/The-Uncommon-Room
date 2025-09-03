@@ -661,22 +661,38 @@ export class DatabaseStorage implements IStorage {
           
         console.log(`Using ${productsData.length} products as placeholders for inventory`);
         
+        // Helper function to safely parse numbers
+        const parseNumber = (value: any): number => {
+          if (value === null || value === undefined) return 0;
+          if (typeof value === 'number') return value;
+          if (typeof value === 'string') {
+            const parsed = parseFloat(value);
+            return !isNaN(parsed) ? parsed : 0;
+          }
+          return 0;
+        };
+        
+        // Create normalized inventory data from products
         const inventoryData = productsData.map(product => ({
-          ...product,
+          productId: parseNumber(product.productId),
+          name: typeof product.name === 'string' ? product.name : 'Unknown',
+          category: typeof product.category === 'string' ? product.category : 'N/A',
+          price: parseNumber(product.price),
           quantity: 0,
           costPrice: "0.00",
-          lastUpdated: null
+          lastUpdated: new Date().toISOString()
         }));
         
-        return {
+        const report = {
           totalProducts: inventoryData.length,
           totalValue: 0,
-          lowStockItems: inventoryData.length,
+          lowStockItems: 0,
           outOfStockItems: inventoryData.length,
           inventoryData,
-          lowStockItems: inventoryData,
-          outOfStockItems: inventoryData,
         };
+        
+        console.log('Generated placeholder inventory report with zero quantities');
+        return report;
       }
       
       // Normal flow with inventory records
@@ -696,40 +712,73 @@ export class DatabaseStorage implements IStorage {
 
       console.log(`Successfully retrieved ${inventoryData.length} inventory items`);
 
-      // Ensure inventory quantities are numbers
+      // Helper function to safely parse numbers
+      const parseNumber = (value: any): number => {
+        if (value === null || value === undefined) return 0;
+        if (typeof value === 'number') return value;
+        if (typeof value === 'string') {
+          const parsed = parseFloat(value);
+          return !isNaN(parsed) ? parsed : 0;
+        }
+        return 0;
+      };
+
+      // Log some sample items for debugging
+      if (inventoryData.length > 0) {
+        console.log('Sample inventory item (raw):', JSON.stringify(inventoryData[0]));
+      }
+      
+      // Normalize all inventory data to ensure consistent types
       const normalizedInventory = inventoryData.map(item => ({
-        ...item,
-        quantity: typeof item.quantity === 'number' ? item.quantity : parseInt(item.quantity as any) || 0,
-        price: typeof item.price === 'string' ? parseFloat(item.price) : item.price
+        productId: parseNumber(item.productId),
+        name: typeof item.name === 'string' ? item.name : 'Unknown',
+        category: typeof item.category === 'string' ? item.category : 'N/A',
+        price: parseNumber(item.price),
+        quantity: parseNumber(item.quantity),
+        costPrice: item.costPrice || '0',
+        lastUpdated: item.lastUpdated || new Date().toISOString()
       }));
+      
+      if (normalizedInventory.length > 0) {
+        console.log('Sample inventory item (normalized):', JSON.stringify(normalizedInventory[0]));
+      }
 
       const lowStockItems = normalizedInventory.filter(item => item.quantity <= 5 && item.quantity > 0);
       const outOfStockItems = normalizedInventory.filter(item => item.quantity === 0);
 
       const totalValue = normalizedInventory.reduce((sum, item) => {
-        const price = typeof item.price === 'string' ? parseFloat(item.price) : item.price;
-        return sum + (price * item.quantity);
+        return sum + (item.price * item.quantity);
       }, 0);
 
-      return {
+      // Return normalized report data with consistent types
+      const report = {
         totalProducts: normalizedInventory.length,
-        totalValue: totalValue.toFixed(2),
+        totalValue: parseFloat(totalValue.toFixed(2)),  // Return as number, not string
         lowStockItems: lowStockItems.length,
         outOfStockItems: outOfStockItems.length,
         inventoryData: normalizedInventory,
-        lowStockItems,
-        outOfStockItems,
       };
+      
+      console.log('Inventory report summary:');
+      console.log(`- Total products: ${report.totalProducts}`);
+      console.log(`- Total value: ${report.totalValue}`);
+      console.log(`- Low stock items: ${report.lowStockItems}`);
+      console.log(`- Out of stock items: ${report.outOfStockItems}`);
+      
+      return report;
     } catch (error) {
       console.error('Error generating inventory report:', error);
       // Return a basic structure so the UI doesn't break
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error generating inventory report';
+      console.error(errorMessage);
+      
       return {
         totalProducts: 0,
         totalValue: 0,
         lowStockItems: 0,
         outOfStockItems: 0,
         inventoryData: [],
-        error: error instanceof Error ? error.message : 'Unknown error generating inventory report'
+        error: errorMessage
       };
     }
   }
@@ -805,50 +854,103 @@ export class DatabaseStorage implements IStorage {
   }
 
   async generateCustomDesignReport(startDate?: string, endDate?: string): Promise<any> {
-    let whereClause = sql`1=1`;
-    
-    if (startDate && endDate) {
-      whereClause = sql`${customDesignRequests.createdAt} >= ${startDate} AND ${customDesignRequests.createdAt} <= ${endDate}`;
+    try {
+      let whereClause = sql`1=1`;
+      
+      if (startDate && endDate) {
+        whereClause = sql`${customDesignRequests.createdAt} >= ${startDate} AND ${customDesignRequests.createdAt} <= ${endDate}`;
+      }
+
+      // Count requests by status for summary stats
+      const statusCountsPromise = db
+        .select({
+          status: customDesignRequests.status,
+          count: sql<number>`count(*)`,
+        })
+        .from(customDesignRequests)
+        .where(whereClause)
+        .groupBy(customDesignRequests.status);
+      
+      // Get all custom design requests with user info
+      const customDesignsDataPromise = db
+        .select({
+          id: customDesignRequests.designId,
+          customer_name: users.name,
+          customer_email: users.email,
+          status: customDesignRequests.status,
+          description: customDesignRequests.description,
+          budget: customDesignRequests.budget,
+          timeline: customDesignRequests.timeline,
+          reference_links: customDesignRequests.referenceLinks,
+          created_at: customDesignRequests.createdAt,
+        })
+        .from(customDesignRequests)
+        .innerJoin(users, eq(customDesignRequests.userId, users.id))
+        .where(whereClause)
+        .orderBy(desc(customDesignRequests.createdAt));
+
+      // Legacy format - kept for backward compatibility
+      const recentRequestsPromise = db
+        .select({
+          designId: customDesignRequests.designId,
+          customerName: users.name,
+          furnitureType: customDesignRequests.furnitureType,
+          status: customDesignRequests.status,
+          quoteAmount: customDesignRequests.quoteAmount,
+          createdAt: customDesignRequests.createdAt,
+        })
+        .from(customDesignRequests)
+        .innerJoin(users, eq(customDesignRequests.userId, users.id))
+        .where(whereClause)
+        .orderBy(desc(customDesignRequests.createdAt))
+        .limit(10);
+
+      // Wait for all queries to complete
+      const [statusCounts, customDesignsData, recentRequests] = await Promise.all([
+        statusCountsPromise,
+        customDesignsDataPromise,
+        recentRequestsPromise
+      ]);
+
+      // Count totals by status
+      const pendingRequests = statusCounts.find(s => s.status === 'pending')?.count || 0;
+      const approvedRequests = statusCounts.find(s => s.status === 'approved')?.count || 0;
+      const rejectedRequests = statusCounts.find(s => s.status === 'rejected')?.count || 0;
+      const totalRequests = statusCounts.reduce((sum, item) => sum + Number(item.count), 0);
+
+      // Format data according to both new and legacy formats
+      return {
+        // New format
+        totalRequests,
+        pendingRequests,
+        approvedRequests,
+        rejectedRequests,
+        customDesignsData: customDesignsData.map(item => ({
+          ...item,
+          id: Number(item.id),
+          budget: item.budget || '0',
+          reference_links: item.reference_links || '',
+          customer_name: item.customer_name || 'Unknown'
+        })),
+        
+        // Legacy format
+        statusBreakdown: statusCounts,
+        recentRequests,
+      };
+    } catch (error) {
+      console.error('Error generating custom design report:', error);
+      // Return a basic structure so the UI doesn't break
+      return {
+        totalRequests: 0,
+        pendingRequests: 0,
+        approvedRequests: 0,
+        rejectedRequests: 0,
+        customDesignsData: [],
+        statusBreakdown: [],
+        recentRequests: [],
+        error: error instanceof Error ? error.message : 'Unknown error generating custom design report'
+      };
     }
-
-    const [designStats] = await db
-      .select({
-        totalRequests: sql<number>`count(*)`,
-        pendingRequests: sql<number>`count(*)`,
-      })
-      .from(customDesignRequests)
-      .where(whereClause);
-
-    const statusBreakdown = await db
-      .select({
-        status: customDesignRequests.status,
-        count: sql<number>`count(*)`,
-      })
-      .from(customDesignRequests)
-      .where(whereClause)
-      .groupBy(customDesignRequests.status);
-
-    const recentRequests = await db
-      .select({
-        designId: customDesignRequests.designId,
-        customerName: users.name,
-        furnitureType: customDesignRequests.furnitureType,
-        status: customDesignRequests.status,
-        quoteAmount: customDesignRequests.quoteAmount,
-        createdAt: customDesignRequests.createdAt,
-      })
-      .from(customDesignRequests)
-      .innerJoin(users, eq(customDesignRequests.userId, users.id))
-      .where(whereClause)
-      .orderBy(desc(customDesignRequests.createdAt))
-      .limit(10);
-
-    return {
-      totalRequests: designStats.totalRequests || 0,
-      pendingRequests: designStats.pendingRequests || 0,
-      statusBreakdown,
-      recentRequests,
-    };
   }
 }
 

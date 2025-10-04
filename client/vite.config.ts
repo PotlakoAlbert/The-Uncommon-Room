@@ -4,6 +4,19 @@ import path from 'path';
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    target: 'esnext',
+    minify: 'terser',
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            return 'vendor';
+          }
+        }
+      }
+    },
+  },
   server: {
     proxy: {
       '/api': {

@@ -176,23 +176,28 @@ export class DatabaseStorage implements IStorage {
     material?: string; 
     search?: string 
   }): Promise<Product[]> {
-    let query = db.select().from(products).where(eq(products.active, true));
-
+    let conditions = [eq(products.active, true)];
+    
     if (filters?.category) {
-      query = query.where(eq(products.category, filters.category as any));
+      conditions.push(eq(products.category, filters.category as any));
     }
     if (filters?.minPrice) {
-      query = query.where(gte(products.price, filters.minPrice.toString()));
+      conditions.push(gte(products.price, filters.minPrice.toString()));
     }
     if (filters?.maxPrice) {
-      query = query.where(lte(products.price, filters.maxPrice.toString()));
+      conditions.push(lte(products.price, filters.maxPrice.toString()));
     }
     if (filters?.material) {
-      query = query.where(like(products.material, `%${filters.material}%`));
+      conditions.push(like(products.material, `%${filters.material}%`));
     }
     if (filters?.search) {
-      query = query.where(like(products.name, `%${filters.search}%`));
+      conditions.push(like(products.name, `%${filters.search}%`));
     }
+
+    const query = db
+      .select()
+      .from(products)
+      .where(and(...conditions));
 
     return await query.orderBy(desc(products.createdAt));
   }
@@ -205,36 +210,49 @@ export class DatabaseStorage implements IStorage {
     search?: string 
   }): Promise<Product[]> {
     // For admin, get all products (including inactive ones)
-    let query = db.select().from(products);
+    let conditions = [];
 
     if (filters?.category) {
-      query = query.where(eq(products.category, filters.category as any));
+      conditions.push(eq(products.category, filters.category as any));
     }
     if (filters?.minPrice) {
-      query = query.where(gte(products.price, filters.minPrice.toString()));
+      conditions.push(gte(products.price, filters.minPrice.toString()));
     }
     if (filters?.maxPrice) {
-      query = query.where(lte(products.price, filters.maxPrice.toString()));
+      conditions.push(lte(products.price, filters.maxPrice.toString()));
     }
     if (filters?.material) {
-      query = query.where(like(products.material, `%${filters.material}%`));
+      conditions.push(like(products.material, `%${filters.material}%`));
     }
     if (filters?.search) {
-      query = query.where(like(products.name, `%${filters.search}%`));
+      conditions.push(like(products.name, `%${filters.search}%`));
     }
 
-    return await query.orderBy(desc(products.createdAt));
+    return await db
+      .select()
+      .from(products)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(products.createdAt));
   }
 
   async createProduct(product: InsertProduct): Promise<Product> {
-    const [newProduct] = await db.insert(products).values(product).returning();
+    const productToInsert = {
+      ...product,
+      galleryImages: Array.isArray(product.galleryImages) ? product.galleryImages.map(String) : []
+    } as const;
+    const [newProduct] = await db.insert(products).values(productToInsert).returning();
     return newProduct;
   }
 
   async updateProduct(id: number, product: Partial<InsertProduct>): Promise<Product> {
+    const updateData = {
+      ...product,
+      updatedAt: new Date(),
+      galleryImages: Array.isArray(product.galleryImages) ? product.galleryImages.map(String) : product.galleryImages
+    };
     const [updatedProduct] = await db
       .update(products)
-      .set({ ...product, updatedAt: new Date() })
+      .set(updateData)
       .where(eq(products.prodId, id))
       .returning();
     return updatedProduct;

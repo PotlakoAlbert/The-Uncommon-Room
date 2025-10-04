@@ -14,8 +14,13 @@ export default defineConfig({
             return 'vendor';
           }
         }
-      }
+      },
+      external: []
     },
+    sourcemap: true
+  },
+  define: {
+    'process.env': process.env
   },
   server: {
     proxy: {

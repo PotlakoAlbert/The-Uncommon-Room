@@ -1,6 +1,7 @@
 import * as esbuild from 'esbuild';
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
+import { writeFile } from 'fs/promises';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -15,6 +16,13 @@ async function build() {
       format: 'esm',
       target: 'node18',
       outfile: 'api/index.mjs',
+      external: [
+        '@babel/preset-typescript',
+        '@babel/preset-typescript/package.json',
+        'lightningcss/node',
+        '../pkg',
+        '../lightningcss.*.node'
+      ],
       banner: {
         js: `
           import { createRequire } from 'module';
@@ -47,7 +55,7 @@ async function build() {
     };
 
     // Write function.json
-    await Bun.write('api/function.json', JSON.stringify(functionJson, null, 2));
+    await writeFile('api/function.json', JSON.stringify(functionJson, null, 2));
 
     console.log('Build completed successfully!');
   } catch (error) {

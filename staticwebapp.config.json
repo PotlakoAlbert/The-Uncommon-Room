@@ -1,20 +1,25 @@
 {
-  "navigationFallback": {
-    "rewrite": "/index.html",
-    "exclude": ["/images/*", "/css/*", "/api/*"]
-  },
   "routes": [
     {
       "route": "/api/*",
-      "methods": ["GET", "POST", "PUT", "DELETE"],
-      "rewrite": "/api/index.js"
+      "serve": "/api/index.js",
+      "methods": ["GET", "POST", "PUT", "DELETE"]
+    },
+    {
+      "route": "/*",
+      "serve": "/static/index.html",
+      "statusCode": 200
     }
   ],
+  "navigationFallback": {
+    "rewrite": "/static/index.html"
+  },
   "platform": {
     "apiRuntime": "node:18"
   },
-  "outputLocation": {
-    "api": "api",
-    "app": "dist"
+  "mimeTypes": {
+    ".js": "text/javascript",
+    ".css": "text/css",
+    ".html": "text/html"
   }
 }

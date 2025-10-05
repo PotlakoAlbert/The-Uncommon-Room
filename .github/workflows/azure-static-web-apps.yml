@@ -25,16 +25,16 @@ jobs:
         with:
           node-version: '18'
 
-      - name: Install Root Dependencies
-        run: npm install
+      - name: Install and Build API
+        run: |
+          npm install
+          npm run build
 
-      - name: Install Client Dependencies
+      - name: Install and Build Client
         working-directory: ./client
-        run: npm install
-
-      - name: Build Client
-        working-directory: ./client
-        run: npm run build
+        run: |
+          npm install
+          npm run build
 
       - name: Build And Deploy
         id: builddeploy
@@ -44,10 +44,10 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: "upload"
           app_location: "client"
-          api_location: "server"
+          api_location: "api"
           output_location: "dist"
-          skip_api_build: false
-          is_static_export: true
+          app_artifact_location: "dist"
+          api_artifact_location: "api"
 
   close_pull_request_job:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'

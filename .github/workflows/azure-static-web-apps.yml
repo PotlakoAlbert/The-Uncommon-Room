@@ -25,12 +25,16 @@ jobs:
         with:
           node-version: '18'
 
-      - name: Install Dependencies
-        run: |
-          npm install
-          cd client && npm install
-          cd ../server && npm install
-          cd ..
+      - name: Install Root Dependencies
+        run: npm install
+
+      - name: Install Client Dependencies
+        working-directory: ./client
+        run: npm install
+
+      - name: Build Client
+        working-directory: ./client
+        run: npm run build
 
       - name: Build And Deploy
         id: builddeploy
@@ -42,9 +46,8 @@ jobs:
           app_location: "client"
           api_location: "server"
           output_location: "dist"
-          app_build_command: "npm run build"
-          api_build_command: "npm run build"
-          deployment_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          skip_api_build: false
+          is_static_export: true
 
   close_pull_request_job:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'

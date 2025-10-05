@@ -2,7 +2,7 @@
   "routes": [
     {
       "route": "/api/*",
-      "rewrite": "/api/index"
+      "rewrite": "/api/index.mjs"
     },
     {
       "route": "/*",

@@ -46,8 +46,12 @@ jobs:
           app_location: "client"
           api_location: "api"
           output_location: "dist"
-          skip_api_build: true
-          skip_app_build: true
+          app_artifact_location: "client/dist"
+          api_build_command: "npm run build:server"
+          app_build_command: "npm run build"
+          skip_app_build: false
+          skip_api_build: false
+          deployment_environment: "production"
 
   close_pull_request_job:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'

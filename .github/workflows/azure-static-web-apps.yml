@@ -25,22 +25,38 @@ jobs:
         with:
           node-version: '18'
 
-      - name: Install and Build
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Build Client
+        working-directory: ./client
         run: |
-          # Build API
-          npm install
-          npm run build:server
-          
-          # Build Client
-          cd client
           npm install
           npm run build
-          cd ..
-          
-          # Create deployment structure
-          mkdir -p public
-          cp -r client/dist/* public/
-          cp -r api api-build
+
+      - name: Build API
+        run: |
+          npm install
+          npm run build:server
+          # Create function.json for Azure Functions
+          echo '{
+            "bindings": [
+              {
+                "authLevel": "anonymous",
+                "type": "httpTrigger",
+                "direction": "in",
+                "name": "req",
+                "methods": ["get", "post", "put", "delete"]
+              },
+              {
+                "type": "http",
+                "direction": "out",
+                "name": "res"
+              }
+            ]
+          }' > api/function.json
 
       - name: Build And Deploy
         id: builddeploy
@@ -49,11 +65,11 @@ jobs:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: "upload"
-          app_location: "public"
-          api_location: "api-build"
-          output_location: "."
-          skip_app_build: true
-          skip_api_build: true
+          app_location: "client"
+          api_location: "api"
+          output_location: "dist"
+          api_build_command: "echo 'API already built'"
+          app_build_command: "echo 'App already built'"
 
   close_pull_request_job:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'

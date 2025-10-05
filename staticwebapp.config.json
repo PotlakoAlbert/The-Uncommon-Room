@@ -2,8 +2,7 @@
   "routes": [
     {
       "route": "/api/*",
-      "serve": "/index.js",
-      "methods": ["GET", "POST", "PUT", "DELETE"]
+      "rewrite": "/api/index"
     },
     {
       "route": "/*",
@@ -12,14 +11,14 @@
     }
   ],
   "navigationFallback": {
-    "rewrite": "/index.html"
+    "rewrite": "/index.html",
+    "exclude": ["/api/*", "/assets/*"]
   },
   "platform": {
     "apiRuntime": "node:18"
   },
-  "mimeTypes": {
-    ".js": "text/javascript",
-    ".css": "text/css",
-    ".html": "text/html"
+  "functions": {
+    "language": "node",
+    "version": "18"
   }
 }

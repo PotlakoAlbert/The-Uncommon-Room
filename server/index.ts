@@ -1,12 +1,33 @@
-import express, { type Request, Response, NextFunction } from "express";
+import express, { type Request, Response, NextFunction, type Express } from "express";
 import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
 import { config } from 'dotenv';
-import { resolve } from 'path';
+import { dirname, resolve } from 'path';
+import { fileURLToPath } from 'url';
 
-// These will be provided by the build process banner
-declare const __dirname: string;
-config({ path: resolve(__dirname, '..', '.env') });
+const isDevelopment = process.env.NODE_ENV === 'development';
+const log = console.log;
+
+// Initialize development dependencies
+async function initDevDependencies(app: Express) {
+  if (isDevelopment) {
+    try {
+      const { setupVite, serveStatic } = await import('./vite');
+      const server = await import('http').then(http => http.createServer(app));
+      await setupVite(app, server);
+      serveStatic(app);
+      return server;
+    } catch (error) {
+      console.error('Failed to initialize development dependencies:', error);
+      throw error;
+    }
+  }
+  return await import('http').then(http => http.createServer(app));
+}
+
+// Set up dirname for ESM
+const _filename = fileURLToPath(import.meta.url);
+const _dirname = dirname(_filename);
+config({ path: resolve(_dirname, '..', '.env') });
 
 const app = express();
 app.use(express.json());
@@ -68,7 +89,8 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  const server = await registerRoutes(app);
+  await registerRoutes(app);
+  const server = await initDevDependencies(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
@@ -77,15 +99,6 @@ app.use((req, res, next) => {
     res.status(status).json({ message });
     throw err;
   });
-
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
-    await setupVite(app, server);
-  } else {
-    serveStatic(app);
-  }
 
   // ALWAYS serve the app on the port specified in the environment variable PORT
   // Other ports are firewalled. Default to 5000 if not specified.

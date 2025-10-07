@@ -12,8 +12,10 @@ if (process.env.NODE_ENV !== 'production') {
 // Configure Neon with WebSocket for serverless environment
 neonConfig.webSocketConstructor = ws;
 neonConfig.useSecureWebSocket = true; // Force secure WebSocket
+neonConfig.fetchConnectionCache = true; // Enable connection caching
+neonConfig.pipelineable = false; // Disable pipelining for better stability
 
-function createPool() {
+async function createPool() {
   const DATABASE_URL = process.env.DATABASE_URL;
 
   if (!DATABASE_URL) {
@@ -44,39 +46,61 @@ function createPool() {
       params.set('sslmode', 'require');
     }
     if (!params.has('pool_timeout')) {
-      params.set('pool_timeout', '10');
+      params.set('pool_timeout', '30');
+    }
+    // Set explicit connect timeout
+    if (!params.has('connect_timeout')) {
+      params.set('connect_timeout', '10');
     }
 
     // Update URL with parameters
     dbUrl.search = params.toString();
     
-    return new Pool({
-      connectionString: dbUrl.toString(),
-      ssl: {
-        rejectUnauthorized: false
-      },
-      connectionTimeoutMillis: 10000,
-      idleTimeoutMillis: 20000,
-      max: 10,
-      allowExitOnIdle: true
-    });
+    // Create pool with retries
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const pool = new Pool({
+          connectionString: dbUrl.toString(),
+          ssl: {
+            rejectUnauthorized: false
+          },
+          connectionTimeoutMillis: 30000, // 30 seconds
+          idleTimeoutMillis: 60000, // 1 minute
+          max: 5, // Reduce max connections for serverless
+          allowExitOnIdle: true,
+          keepAlive: true,
+        });
+
+        // Test connection before returning pool
+        await pool.connect();
+        console.log('Database connection test successful');
+        return pool;
+      } catch (err) {
+        console.error(`Connection attempt ${attempt} failed:`, err);
+        if (attempt === 3) throw err;
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+      }
+    }
   } catch (error) {
     console.error('Error configuring database connection:', error);
     throw error;
   }
 }
 
-// Create the connection pool
-const pool = createPool();
+// Create the connection pool with error handling
+let pool: Pool;
+try {
+  pool = await createPool();
+} catch (error) {
+  console.error('Failed to create database pool:', error);
+  throw error;
+}
 
 // Initialize Drizzle with the connection pool
-export const db = drizzle(pool, { schema });
+export const db = drizzle(pool, { 
+  schema,
+  logger: process.env.NODE_ENV !== 'production'
+});
 
-// Test the connection
-pool.connect()
-  .then(() => {
-    console.log('Successfully connected to database');
-  })
-  .catch((err) => {
-    console.error('Failed to connect to database:', err);
-  });
+// Export pool for potential direct usage
+export { pool };

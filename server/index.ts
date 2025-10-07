@@ -2,12 +2,10 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { config } from 'dotenv';
-import { fileURLToPath } from 'url';
-import { dirname, resolve } from 'path';
+import { resolve } from 'path';
 
-// Load environment variables from .env file
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+// These will be provided by the build process banner
+declare const __dirname: string;
 config({ path: resolve(__dirname, '..', '.env') });
 
 const app = express();

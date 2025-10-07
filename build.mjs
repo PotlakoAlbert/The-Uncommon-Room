@@ -20,17 +20,10 @@ async function ensureDirectory(filepath) {
 }
 
 // Define environment variables that should be available at runtime
+// Only define NODE_ENV at build time, let Railway handle runtime env vars
 const definedEnvVars = {
   'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'production'),
-  // Use placeholder for DATABASE_URL during build if not available
-  'process.env.DATABASE_URL': JSON.stringify(process.env.DATABASE_URL || 'placeholder-for-runtime'),
-  'process.env.FRONTEND_URL': JSON.stringify(process.env.FRONTEND_URL || ''),
-  'process.env.CORS_ORIGIN': JSON.stringify(process.env.CORS_ORIGIN || '*'),
-  'process.env.PORT': JSON.stringify(process.env.PORT || '5000'),
-  'process.env.JWT_SECRET': JSON.stringify(process.env.JWT_SECRET || 'placeholder-for-runtime'),
-  'process.env.SESSION_SECRET': JSON.stringify(process.env.SESSION_SECRET || 'placeholder-for-runtime'),
-  // Add explicit check for DATABASE_URL
-  'global.DATABASE_URL': JSON.stringify(process.env.DATABASE_URL || 'placeholder-for-runtime'),
+  // Don't define DATABASE_URL and other runtime vars - let Railway inject them
 };
 
 async function build() {
@@ -89,20 +82,6 @@ async function build() {
           globalThis.require = require;
           globalThis.__filename = __filename;
           globalThis.__dirname = __dirname;
-
-          // Runtime environment variable validation
-          process.on('beforeExit', () => {
-            // Only validate in production (Railway)
-            if (process.env.NODE_ENV === 'production') {
-              const requiredVars = ['DATABASE_URL', 'JWT_SECRET', 'SESSION_SECRET'];
-              const missing = requiredVars.filter(v => !process.env[v]);
-              
-              if (missing.length > 0) {
-                console.error('Missing required environment variables:', missing.join(', '));
-                process.exit(1);
-              }
-            }
-          });
         `
       },
     });

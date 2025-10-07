@@ -16,8 +16,21 @@ neonConfig.useSecureWebSocket = true; // Force secure WebSocket
 async function createPool(): Promise<Pool> {
   const DATABASE_URL = process.env.DATABASE_URL;
 
+  // Debug logging
+  console.log('Environment check:', {
+    NODE_ENV: process.env.NODE_ENV,
+    DATABASE_URL_SET: !!DATABASE_URL,
+    DATABASE_URL_LENGTH: DATABASE_URL?.length || 0,
+    DATABASE_URL_STARTS_WITH: DATABASE_URL?.substring(0, 15) || 'N/A'
+  });
+
   if (!DATABASE_URL) {
     throw new Error("DATABASE_URL must be set in environment variables.");
+  }
+
+  // Check for placeholder values that might come from build process
+  if (DATABASE_URL === 'placeholder-for-runtime' || DATABASE_URL === 'undefined' || DATABASE_URL === 'null') {
+    throw new Error("DATABASE_URL contains placeholder value. Check Railway environment variables configuration.");
   }
 
   try {
@@ -86,20 +99,66 @@ async function createPool(): Promise<Pool> {
   }
 }
 
-// Create the connection pool with error handling
-let pool: Pool;
-try {
-  pool = await createPool();
-} catch (error) {
-  console.error('Failed to create database pool:', error);
-  throw error;
+// Lazy initialization for the connection pool
+let pool: Pool | null = null;
+let drizzleDb: any = null;
+
+async function initializeDatabase() {
+  if (pool && drizzleDb) {
+    return { pool, db: drizzleDb };
+  }
+
+  try {
+    pool = await createPool();
+    drizzleDb = drizzle(pool, { 
+      schema,
+      logger: process.env.NODE_ENV !== 'production'
+    });
+    
+    return { pool, db: drizzleDb };
+  } catch (error) {
+    console.error('Failed to create database pool:', error);
+    throw error;
+  }
 }
 
-// Initialize Drizzle with the connection pool
-export const db = drizzle(pool, { 
-  schema,
-  logger: process.env.NODE_ENV !== 'production'
-});
+// Export lazy-initialized database connection
+export async function getDb() {
+  const { db } = await initializeDatabase();
+  return db;
+}
 
-// Export pool for potential direct usage
-export { pool };
+export async function getPool() {
+  const { pool } = await initializeDatabase();
+  return pool;
+}
+
+// For backwards compatibility, export a promise-based db
+export const db = {
+  async query(...args: any[]) {
+    const database = await getDb();
+    return database.query(...args);
+  },
+  async select(...args: any[]) {
+    const database = await getDb();
+    return database.select(...args);
+  },
+  async insert(...args: any[]) {
+    const database = await getDb();
+    return database.insert(...args);
+  },
+  async update(...args: any[]) {
+    const database = await getDb();
+    return database.update(...args);
+  },
+  async delete(...args: any[]) {
+    const database = await getDb();
+    return database.delete(...args);
+  },
+  get transaction() {
+    return async (callback: any) => {
+      const database = await getDb();
+      return database.transaction(callback);
+    };
+  }
+};

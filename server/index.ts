@@ -27,7 +27,32 @@ async function initDevDependencies(app: Express) {
 // Set up dirname for ESM
 const _filename = fileURLToPath(import.meta.url);
 const _dirname = dirname(_filename);
-config({ path: resolve(_dirname, '..', '.env') });
+
+// Load environment variables in development
+if (isDevelopment) {
+  config({ path: resolve(_dirname, '..', '.env') });
+}
+
+// Debug environment variables
+console.log('Server startup environment check:', {
+  NODE_ENV: process.env.NODE_ENV,
+  DATABASE_URL_SET: !!process.env.DATABASE_URL,
+  DATABASE_URL_TYPE: typeof process.env.DATABASE_URL,
+  ALL_ENV_KEYS: Object.keys(process.env).filter(key => key.includes('DATABASE')),
+});
+
+// Test database initialization
+async function testDatabase() {
+  try {
+    const { getDb } = await import('./db.js');
+    const db = await getDb();
+    console.log('✅ Database connection successful');
+    return true;
+  } catch (error) {
+    console.error('❌ Database connection failed:', error instanceof Error ? error.message : String(error));
+    return false;
+  }
+}
 
 const app = express();
 app.use(express.json());
@@ -89,6 +114,9 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Test database connection first
+  await testDatabase();
+  
   await registerRoutes(app);
   const server = await initDevDependencies(app);
 

@@ -3,21 +3,39 @@ import { drizzle } from 'drizzle-orm/neon-serverless';
 import ws from "ws";
 import * as schema from "@shared/schema";
 import { config } from 'dotenv';
-import { fileURLToPath } from 'url';
-import { dirname, resolve } from 'path';
 
-// Load environment variables from .env file
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-config({ path: resolve(__dirname, '..', '.env') });
+// Only load .env file in development
+if (process.env.NODE_ENV !== 'production') {
+  config();
+}
 
+// Configure Neon with WebSocket for serverless environment
 neonConfig.webSocketConstructor = ws;
 
-if (!process.env.DATABASE_URL) {
+// Get DATABASE_URL from environment
+const DATABASE_URL = process.env.DATABASE_URL;
+
+if (!DATABASE_URL) {
   throw new Error(
-    "DATABASE_URL must be set. Did you forget to provision a database?",
+    "DATABASE_URL must be set in environment variables.",
   );
 }
 
-export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-export const db = drizzle({ client: pool, schema });
+// Create connection pool with improved configuration
+const pool = new Pool({ 
+  connectionString: DATABASE_URL,
+  ssl: process.env.NODE_ENV === 'production' ? true : undefined,
+  connectionTimeoutMillis: 5000,
+  idleTimeoutMillis: 10000,
+  max: 20,
+});
+
+// Initialize Drizzle with the connection pool
+export const db = drizzle(pool, { schema });
+
+// Test the connection
+pool.connect().then(() => {
+  console.log('Successfully connected to database');
+}).catch((err) => {
+  console.error('Failed to connect to database:', err);
+});

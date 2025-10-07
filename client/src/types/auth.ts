@@ -23,6 +23,7 @@ export interface LoginCredentials {
 }
 
 export interface AuthResponse {
+  accessToken: string | null;
   user: User;
   token: string;
   message: string;

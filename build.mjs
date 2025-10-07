@@ -23,7 +23,8 @@ async function ensureDirectory(filepath) {
 // Only define NODE_ENV at build time, let Railway handle runtime env vars
 const definedEnvVars = {
   'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'production'),
-  // Don't define DATABASE_URL and other runtime vars - let Railway inject them
+  // Add fallback DATABASE_URL for Railway deployment issues
+  'process.env.FALLBACK_DATABASE_URL': JSON.stringify('postgresql://neondb_owner:npg_iqRAj4Yl8XyN@ep-lingering-king-ad0o3wyd-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require'),
 };
 
 async function build() {

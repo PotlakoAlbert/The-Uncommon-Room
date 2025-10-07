@@ -14,7 +14,13 @@ neonConfig.webSocketConstructor = ws;
 neonConfig.useSecureWebSocket = true; // Force secure WebSocket
 
 async function createPool(): Promise<Pool> {
-  const DATABASE_URL = process.env.DATABASE_URL;
+  let DATABASE_URL = process.env.DATABASE_URL;
+
+  // Fallback to static URL if environment variable is not set (Railway deployment issue)
+  if (!DATABASE_URL) {
+    console.warn('DATABASE_URL not found in environment variables, using fallback URL');
+    DATABASE_URL = process.env.FALLBACK_DATABASE_URL || 'postgresql://neondb_owner:npg_iqRAj4Yl8XyN@ep-lingering-king-ad0o3wyd-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require';
+  }
 
   // Debug logging
   console.log('Environment check:', {
@@ -23,10 +29,6 @@ async function createPool(): Promise<Pool> {
     DATABASE_URL_LENGTH: DATABASE_URL?.length || 0,
     DATABASE_URL_STARTS_WITH: DATABASE_URL?.substring(0, 15) || 'N/A'
   });
-
-  if (!DATABASE_URL) {
-    throw new Error("DATABASE_URL must be set in environment variables.");
-  }
 
   // Check for placeholder values that might come from build process
   if (DATABASE_URL === 'placeholder-for-runtime' || DATABASE_URL === 'undefined' || DATABASE_URL === 'null') {

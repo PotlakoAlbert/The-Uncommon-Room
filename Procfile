@@ -1,1 +1,1 @@
-web: node api/index.mjs
+web: NODE_ENV=production node api/index.mjs

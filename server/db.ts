@@ -13,9 +13,8 @@ if (process.env.NODE_ENV !== 'production') {
 neonConfig.webSocketConstructor = ws;
 neonConfig.useSecureWebSocket = true; // Force secure WebSocket
 neonConfig.fetchConnectionCache = true; // Enable connection caching
-neonConfig.pipelineable = false; // Disable pipelining for better stability
 
-async function createPool() {
+async function createPool(): Promise<Pool> {
   const DATABASE_URL = process.env.DATABASE_URL;
 
   if (!DATABASE_URL) {
@@ -81,6 +80,7 @@ async function createPool() {
         await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
       }
     }
+    throw new Error('Failed to create pool after all attempts');
   } catch (error) {
     console.error('Error configuring database connection:', error);
     throw error;

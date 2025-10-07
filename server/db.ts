@@ -12,7 +12,6 @@ if (process.env.NODE_ENV !== 'production') {
 // Configure Neon with WebSocket for serverless environment
 neonConfig.webSocketConstructor = ws;
 neonConfig.useSecureWebSocket = true; // Force secure WebSocket
-neonConfig.fetchConnectionCache = true; // Enable connection caching
 
 async function createPool(): Promise<Pool> {
   const DATABASE_URL = process.env.DATABASE_URL;

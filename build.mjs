@@ -1,6 +1,13 @@
 import * as esbuild from 'esbuild';
 import { writeFile, mkdir } from 'fs/promises';
 import { dirname } from 'path';
+import { config } from 'dotenv';
+import { fileURLToPath } from 'url';
+import { resolve } from 'path';
+
+// Load environment variables
+const __dirname = dirname(fileURLToPath(import.meta.url));
+config({ path: resolve(__dirname, '.env') });
 
 async function ensureDirectory(filepath) {
   try {
@@ -12,8 +19,26 @@ async function ensureDirectory(filepath) {
   }
 }
 
+// Define environment variables that should be available at runtime
+const definedEnvVars = {
+  'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'production'),
+  'process.env.DATABASE_URL': JSON.stringify(process.env.DATABASE_URL),
+  'process.env.FRONTEND_URL': JSON.stringify(process.env.FRONTEND_URL),
+  'process.env.CORS_ORIGIN': JSON.stringify(process.env.CORS_ORIGIN),
+  'process.env.PORT': JSON.stringify(process.env.PORT || '5000'),
+  'process.env.JWT_SECRET': JSON.stringify(process.env.JWT_SECRET),
+  'process.env.SESSION_SECRET': JSON.stringify(process.env.SESSION_SECRET),
+  // Add explicit check for DATABASE_URL
+  'global.DATABASE_URL': JSON.stringify(process.env.DATABASE_URL),
+};
+
 async function build() {
   try {
+    // Validate required environment variables
+    if (!process.env.DATABASE_URL) {
+      throw new Error('DATABASE_URL must be set in environment variables for build');
+    }
+
     // Ensure api directory exists
     await ensureDirectory('api/index.mjs');
 
@@ -27,6 +52,7 @@ async function build() {
       outfile: 'api/index.mjs',
       sourcemap: true,
       minify: process.env.NODE_ENV === 'production',
+      define: definedEnvVars,
       external: [
         // Native Node.js modules
         'path',
@@ -41,6 +67,7 @@ async function build() {
         '../lightningcss.*.node',
         // Native modules
         'bcrypt',
+        'ws',
         // Database drivers
         'pg-native',
         'sqlite3',
@@ -50,27 +77,28 @@ async function build() {
       banner: {
         js: `
           // ESM module compatibility
-          const loadESMModules = async () => {
-            try {
-              const { createRequire } = await import('module');
-              const { fileURLToPath } = await import('url');
-              const { dirname } = await import('path');
-              
-              const require = createRequire(import.meta.url);
-              const __filename = fileURLToPath(import.meta.url);
-              const __dirname = dirname(__filename);
-              
-              globalThis.require = require;
-              globalThis.__filename = __filename;
-              globalThis.__dirname = __dirname;
-            } catch (error) {
-              console.error('Failed to set up ESM compatibility:', error);
-              process.exit(1);
-            }
-          };
+          import { createRequire } from 'module';
+          import { fileURLToPath } from 'url';
+          import { dirname } from 'path';
           
-          await loadESMModules();
-        `,
+          const require = createRequire(import.meta.url);
+          const __filename = fileURLToPath(import.meta.url);
+          const __dirname = dirname(__filename);
+          
+          globalThis.require = require;
+          globalThis.__filename = __filename;
+          globalThis.__dirname = __dirname;
+
+          // Ensure environment variables are available
+          if (!process.env.DATABASE_URL && global.DATABASE_URL) {
+            process.env.DATABASE_URL = global.DATABASE_URL;
+          }
+          
+          // Validate required environment variables
+          if (!process.env.DATABASE_URL) {
+            throw new Error('DATABASE_URL environment variable is required');
+          }
+        `
       },
     });
 

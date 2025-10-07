@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { testNetworkConnectivity, testBackendHealth } from "../lib/networkDebug";
+import { vercelNetworkDiagnostic } from "../lib/vercelNetworkTest";
 import { apiRequest } from "@/lib/queryClient";
 import { testNetworkConnectivity, testBackendHealth } from "@/lib/networkDebug";
 
@@ -27,6 +29,7 @@ export default function Products() {
     console.log('[Products] Component mounted, running network tests...');
     testNetworkConnectivity();
     testBackendHealth();
+    vercelNetworkDiagnostic();
   }, []);
 
   const { data: products, isLoading, error } = useQuery({

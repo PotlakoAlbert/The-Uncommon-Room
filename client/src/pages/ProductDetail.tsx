@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 
 export default function ProductDetail() {
   const { id } = useParams();
@@ -24,9 +25,11 @@ export default function ProductDetail() {
   const { data: product, isLoading, error } = useQuery({
     queryKey: ['/api/products', id],
     queryFn: async () => {
-      const response = await fetch(`/api/products/${id}`);
-      if (!response.ok) throw new Error('Product not found');
-      return response.json();
+      console.log('[ProductDetail] Fetching product:', id);
+      const response = await apiRequest('GET', `/api/products/${id}`, undefined, { throwOn401: false });
+      const data = await response.json();
+      console.log('[ProductDetail] Fetched product:', data);
+      return data;
     },
   });
 

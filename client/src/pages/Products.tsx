@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { apiRequest } from "@/lib/queryClient";
 
 export default function Products() {
   const [, setLocation] = useLocation();
@@ -20,7 +21,7 @@ export default function Products() {
   const [sortBy, setSortBy] = useState("featured");
   const [viewMode, setViewMode] = useState("grid");
 
-  const { data: products, isLoading } = useQuery({
+  const { data: products, isLoading, error } = useQuery({
     queryKey: ['/api/products', filters],
     queryFn: async () => {
       const params = new URLSearchParams();
@@ -28,9 +29,11 @@ export default function Products() {
         if (value) params.append(key, value);
       });
       
-      const response = await fetch(`/api/products?${params}`);
-      if (!response.ok) throw new Error('Failed to fetch products');
-      return response.json();
+      console.log('[Products] Fetching products with filters:', filters);
+      const response = await apiRequest('GET', `/api/products?${params}`, undefined, { throwOn401: false });
+      const data = await response.json();
+      console.log('[Products] Fetched products:', data);
+      return data;
     },
   });
 
@@ -63,6 +66,21 @@ export default function Products() {
         return 0;
     }
   }) : [];
+
+  if (error) {
+    console.error('[Products] Error loading products:', error);
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-red-600 mb-2">Error Loading Products</h2>
+          <p className="text-muted-foreground mb-4">
+            Failed to load products. Please check your connection and try again.
+          </p>
+          <Button onClick={() => window.location.reload()}>Refresh Page</Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <section className="py-12 px-4 md:px-8 lg:px-16">

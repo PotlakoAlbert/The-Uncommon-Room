@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { apiRequest } from "@/lib/queryClient";
 
 const getStatusColor = (status: string) => {
   switch (status) {
@@ -39,14 +40,11 @@ export default function OrderDetail() {
     queryKey: ['/api/orders', id],
     enabled: isAuthenticated && !!id,
     queryFn: async () => {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`/api/orders/${id}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-      if (!response.ok) throw new Error('Failed to fetch order details');
-      return response.json();
+      console.log('[OrderDetail] Fetching order:', id);
+      const response = await apiRequest('GET', `/api/orders/${id}`);
+      const data = await response.json();
+      console.log('[OrderDetail] Fetched order:', data);
+      return data;
     },
   });
 

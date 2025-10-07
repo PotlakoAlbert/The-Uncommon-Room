@@ -50,9 +50,20 @@ export async function apiRequest(
 
   // Construct full URL with base API URL
   const baseURL = import.meta.env.VITE_API_URL || "http://localhost:5000";
-  const fullUrl = url.startsWith('http') ? url : `${baseURL}${url}`;
   
-  console.log('[apiRequest] Making request to:', fullUrl);
+  // Handle both cases: baseURL with or without /api
+  let fullUrl: string;
+  if (url.startsWith('http')) {
+    fullUrl = url;
+  } else {
+    // Remove trailing /api from baseURL if present, then add our URL
+    const cleanBaseURL = baseURL.replace(/\/api\/?$/, '');
+    fullUrl = `${cleanBaseURL}${url}`;
+  }
+  
+  console.log('[apiRequest] Base URL:', baseURL);
+  console.log('[apiRequest] Request URL:', url);
+  console.log('[apiRequest] Full URL:', fullUrl);
   const res = await fetch(fullUrl, {
     method,
     headers,
@@ -99,7 +110,16 @@ export const getQueryFn: <T>(options: {
     // Construct full URL with base API URL
     const baseURL = import.meta.env.VITE_API_URL || "http://localhost:5000";
     const url = queryKey.join("/") as string;
-    const fullUrl = url.startsWith('http') ? url : `${baseURL}${url}`;
+    
+    // Handle both cases: baseURL with or without /api
+    let fullUrl: string;
+    if (url.startsWith('http')) {
+      fullUrl = url;
+    } else {
+      // Remove trailing /api from baseURL if present, then add our URL
+      const cleanBaseURL = baseURL.replace(/\/api\/?$/, '');
+      fullUrl = `${cleanBaseURL}${url}`;
+    }
 
     const res = await fetch(fullUrl, {
       headers,

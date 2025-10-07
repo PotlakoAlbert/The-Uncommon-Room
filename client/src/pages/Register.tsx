@@ -48,15 +48,37 @@ export default function Register() {
 
   const registerMutation = useMutation({
     mutationFn: async (data: RegisterFormData) => {
+      console.log('[Register] Attempting registration with data:', { ...data, password: '***', confirmPassword: '***' });
       const { confirmPassword, ...registrationData } = data;
-      const response = await apiRequest('POST', '/api/auth/register', registrationData);
-      return response.json();
+      
+      try {
+        const response = await apiRequest('POST', '/api/auth/register', registrationData);
+        const result = await response.json();
+        console.log('[Register] Registration successful:', result);
+        return result;
+      } catch (error) {
+        console.error('[Register] Registration failed:', error);
+        throw error;
+      }
     },
     onSuccess: (data) => {
-      dispatch(loginSuccess({
-        user: { ...(data.user || data.customer), type: 'customer' },
-        token: data.token,
-      }));
+      console.log('[Register] Processing successful registration:', data);
+      
+      // Store token and user data
+      if (data.token) {
+        localStorage.setItem('token', data.token);
+      }
+      
+      if (data.user || data.customer) {
+        const userData = data.user || data.customer;
+        localStorage.setItem('user', JSON.stringify(userData));
+        
+        dispatch(loginSuccess({
+          user: { ...userData, type: 'customer' },
+          token: data.token,
+        }));
+      }
+      
       toast({
         title: "Registration Successful",
         description: "Welcome to The Uncommon Room!",
@@ -64,16 +86,21 @@ export default function Register() {
       setLocation('/');
     },
     onError: (error: any) => {
+      console.error('[Register] Registration error:', error);
       let errorMessage = "Failed to create account";
+      
       if (error.message) {
         if (error.message.includes("Email already registered")) {
           errorMessage = "This email is already registered. Please try logging in instead.";
         } else if (error.message.includes("too long")) {
           errorMessage = "One of the fields is too long. Please check your phone number.";
+        } else if (error.message.includes("fetch")) {
+          errorMessage = "Network error. Please check your connection and try again.";
         } else {
           errorMessage = error.message;
         }
       }
+      
       toast({
         title: "Registration Failed",
         description: errorMessage,

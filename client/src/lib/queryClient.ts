@@ -48,7 +48,12 @@ export async function apiRequest(
     }
   }
 
-  const res = await fetch(url, {
+  // Construct full URL with base API URL
+  const baseURL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+  const fullUrl = url.startsWith('http') ? url : `${baseURL}${url}`;
+  
+  console.log('[apiRequest] Making request to:', fullUrl);
+  const res = await fetch(fullUrl, {
     method,
     headers,
     body: data ? (isFormData ? (data as FormData) : JSON.stringify(data)) : undefined,
@@ -91,7 +96,12 @@ export const getQueryFn: <T>(options: {
       headers["Authorization"] = `Bearer ${token}`;
     }
 
-    const res = await fetch(queryKey.join("/") as string, {
+    // Construct full URL with base API URL
+    const baseURL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+    const url = queryKey.join("/") as string;
+    const fullUrl = url.startsWith('http') ? url : `${baseURL}${url}`;
+
+    const res = await fetch(fullUrl, {
       headers,
       credentials: "include",
     });

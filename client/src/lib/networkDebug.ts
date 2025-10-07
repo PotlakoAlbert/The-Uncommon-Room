@@ -32,9 +32,12 @@ export async function testNetworkConnectivity() {
         headers: Object.fromEntries(response.headers.entries()),
       });
     } catch (error) {
-      console.error(`[NetworkTest] ❌ ${url}:`, {
-        error: error instanceof Error ? error.message : error,
+      console.error(`[NetworkTest] ❌ ${url}:`, error);
+      console.error(`[NetworkTest] Error details for ${url}:`, {
+        message: error instanceof Error ? error.message : String(error),
         type: error instanceof Error ? error.constructor.name : typeof error,
+        stack: error instanceof Error ? error.stack : 'No stack trace',
+        name: error instanceof Error ? error.name : 'Unknown',
       });
     }
   }

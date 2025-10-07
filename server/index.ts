@@ -64,7 +64,8 @@ app.use((req, res, next) => {
   const allowedOrigins = [
     process.env.FRONTEND_URL || 'http://localhost:5173',
     'https://uncommon-furniture.vercel.app',
-    'https://the-uncommon-room.vercel.app'
+    'https://the-uncommon-room.vercel.app',
+    'https://the-uncommon-room-duyr.vercel.app'
   ];
   
   const origin = req.headers.origin;

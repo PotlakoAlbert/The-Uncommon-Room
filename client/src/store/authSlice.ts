@@ -2,15 +2,7 @@ import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import axios from 'axios';
 import { store } from './store';
 import { syncCartOnLogin } from './cartSlice';
-
-interface User {
-  id: number;
-  name: string;
-  email: string;
-  role: string;
-  phone?: string;
-  address?: string;
-}
+import { User, RegisterCredentials, LoginCredentials, AuthResponse } from '../types/auth';
 
 interface AuthState {
   user: User | null;
@@ -32,14 +24,17 @@ declare global {
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000",
   withCredentials: true,
+  headers: {
+    'Content-Type': 'application/json',
+  },
 });
 
 // Async thunks
 export const register = createAsyncThunk(
   "auth/register",
-  async (credentials: { name: string; email: string; password: string }, { rejectWithValue }) => {
+  async (credentials: RegisterCredentials, { rejectWithValue }) => {
     try {
-      const response = await api.post("/api/auth/register", credentials);
+      const response = await api.post<AuthResponse>("/api/auth/register", credentials);
       return response.data;
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || "Registration failed");
@@ -49,9 +44,11 @@ export const register = createAsyncThunk(
 
 export const login = createAsyncThunk(
   "auth/login",
-  async (credentials: { email: string; password: string }, { rejectWithValue }) => {
+  async (credentials: LoginCredentials, { dispatch, rejectWithValue }) => {
     try {
-      const response = await api.post("/api/auth/login", credentials);
+      const response = await api.post<AuthResponse>("/api/auth/login", credentials);
+      // After successful login, sync cart
+      dispatch(syncCartOnLogin());
       return response.data;
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || "Login failed");
@@ -157,11 +154,8 @@ const authSlice = createSlice({
       .addCase(login.fulfilled, (state, action) => {
         state.isLoading = false;
         state.user = action.payload.user;
-        state.token = action.payload.accessToken;
+        state.token = action.payload.token;
         state.isAuthenticated = true;
-        localStorage.setItem('token', action.payload.accessToken);
-        localStorage.setItem('user', JSON.stringify(action.payload.user));
-        console.log('[Auth] Login successful, token set:', action.payload.accessToken.substring(0, 10) + '...');
       })
       .addCase(login.rejected, (state, action) => {
         state.isLoading = false;
@@ -182,9 +176,8 @@ const authSlice = createSlice({
       // Refresh Token
       .addCase(refreshToken.fulfilled, (state, action) => {
         state.user = action.payload.user;
-        state.token = action.payload.accessToken;
+        state.token = action.payload.token;
         state.isAuthenticated = true;
-        localStorage.setItem('token', action.payload.accessToken);
       })
       .addCase(refreshToken.rejected, (state) => {
         state.user = null;

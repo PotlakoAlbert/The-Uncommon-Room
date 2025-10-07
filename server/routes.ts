@@ -66,11 +66,21 @@ const specs = swaggerJsdoc(swaggerOptions);
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Middleware
-  app.use(cors());
+  app.use(cors({
+    origin: [
+      'http://localhost:5173',
+      'https://uncommon-furniture.vercel.app',
+      'https://the-uncommon-room.vercel.app'
+    ],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  }));
   app.use(helmet({
-    contentSecurityPolicy: false, // Disable CSP for development
+    contentSecurityPolicy: false,
     crossOriginEmbedderPolicy: false,
   }));
+  app.use(cookieParser());
   // app.use(limiter); // Temporarily disabled for debugging
 
   // API routes

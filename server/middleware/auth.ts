@@ -17,19 +17,13 @@ export const generateTokens = (user: { id: number; email: string; role: string }
     throw new Error("JWT_SECRET environment variable is not set");
   }
 
-  const accessToken = jwt.sign(
+  const token = jwt.sign(
     { id: user.id, email: user.email, role: user.role },
-    process.env.JWT_SECRET,
-    { expiresIn: "15m" }
-  );
-
-  const refreshToken = jwt.sign(
-    { id: user.id },
     process.env.JWT_SECRET,
     { expiresIn: "7d" }
   );
 
-  return { accessToken, refreshToken };
+  return { token };
 };
 
 export const authenticateToken = async (req: AuthRequest, res: Response, next: NextFunction) => {

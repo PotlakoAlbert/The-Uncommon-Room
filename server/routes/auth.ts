@@ -45,14 +45,17 @@ router.post("/register", async (req, res) => {
         passwordHash,
         phone,
         address,
+        role: 'user' as const,
       })
       .returning({
         id: users.id,
+        name: users.name,
         email: users.email,
         role: users.role,
       });
 
-    const { accessToken, refreshToken } = generateTokens(user);
+// Generate tokens for the user
+const { token: accessToken, token: refreshToken } = await generateTokens(user);
 
     await db
       .update(users)
@@ -66,7 +69,16 @@ router.post("/register", async (req, res) => {
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 
-    res.json({ accessToken, user: { id: user.id, email: user.email, role: user.role } });
+    res.json({
+      message: "Registration successful",
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
+      accessToken,
+    });
   } catch (error) {
     console.error(error);
     res.status(400).json({ message: "Invalid input" });
@@ -90,7 +102,7 @@ router.post("/login", async (req, res) => {
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
-    const { accessToken, refreshToken } = generateTokens({
+    const { token: accessToken, token: refreshToken } = await generateTokens({
       id: user.id,
       email: user.email,
       role: user.role,
@@ -144,10 +156,10 @@ router.post("/refresh-token", async (req, res) => {
 
     await db
       .update(users)
-      .set({ refreshToken: tokens.refreshToken })
+      .set({ refreshToken: tokens.token })
       .where(eq(users.id, user.id));
 
-    res.cookie("refreshToken", tokens.refreshToken, {
+    res.cookie("refreshToken", tokens.token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
@@ -155,7 +167,7 @@ router.post("/refresh-token", async (req, res) => {
     });
 
     res.json({
-      accessToken: tokens.accessToken,
+      accessToken: tokens.token,
       user: { id: user.id, email: user.email, role: user.role },
     });
   } catch (error) {

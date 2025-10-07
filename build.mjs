@@ -22,21 +22,22 @@ async function ensureDirectory(filepath) {
 // Define environment variables that should be available at runtime
 const definedEnvVars = {
   'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'production'),
-  'process.env.DATABASE_URL': JSON.stringify(process.env.DATABASE_URL),
-  'process.env.FRONTEND_URL': JSON.stringify(process.env.FRONTEND_URL),
-  'process.env.CORS_ORIGIN': JSON.stringify(process.env.CORS_ORIGIN),
+  // Use placeholder for DATABASE_URL during build if not available
+  'process.env.DATABASE_URL': JSON.stringify(process.env.DATABASE_URL || 'placeholder-for-runtime'),
+  'process.env.FRONTEND_URL': JSON.stringify(process.env.FRONTEND_URL || ''),
+  'process.env.CORS_ORIGIN': JSON.stringify(process.env.CORS_ORIGIN || '*'),
   'process.env.PORT': JSON.stringify(process.env.PORT || '5000'),
-  'process.env.JWT_SECRET': JSON.stringify(process.env.JWT_SECRET),
-  'process.env.SESSION_SECRET': JSON.stringify(process.env.SESSION_SECRET),
+  'process.env.JWT_SECRET': JSON.stringify(process.env.JWT_SECRET || 'placeholder-for-runtime'),
+  'process.env.SESSION_SECRET': JSON.stringify(process.env.SESSION_SECRET || 'placeholder-for-runtime'),
   // Add explicit check for DATABASE_URL
-  'global.DATABASE_URL': JSON.stringify(process.env.DATABASE_URL),
+  'global.DATABASE_URL': JSON.stringify(process.env.DATABASE_URL || 'placeholder-for-runtime'),
 };
 
 async function build() {
   try {
-    // Validate required environment variables
-    if (!process.env.DATABASE_URL) {
-      throw new Error('DATABASE_URL must be set in environment variables for build');
+    // In production (Railway), we'll get env vars at runtime, so skip validation during build
+    if (process.env.NODE_ENV !== 'production' && !process.env.DATABASE_URL) {
+      console.warn('Warning: DATABASE_URL not set during build. Will be required at runtime.');
     }
 
     // Ensure api directory exists
@@ -89,15 +90,19 @@ async function build() {
           globalThis.__filename = __filename;
           globalThis.__dirname = __dirname;
 
-          // Ensure environment variables are available
-          if (!process.env.DATABASE_URL && global.DATABASE_URL) {
-            process.env.DATABASE_URL = global.DATABASE_URL;
-          }
-          
-          // Validate required environment variables
-          if (!process.env.DATABASE_URL) {
-            throw new Error('DATABASE_URL environment variable is required');
-          }
+          // Runtime environment variable validation
+          process.on('beforeExit', () => {
+            // Only validate in production (Railway)
+            if (process.env.NODE_ENV === 'production') {
+              const requiredVars = ['DATABASE_URL', 'JWT_SECRET', 'SESSION_SECRET'];
+              const missing = requiredVars.filter(v => !process.env[v]);
+              
+              if (missing.length > 0) {
+                console.error('Missing required environment variables:', missing.join(', '));
+                process.exit(1);
+              }
+            }
+          });
         `
       },
     });

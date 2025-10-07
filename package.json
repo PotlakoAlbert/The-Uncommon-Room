@@ -7,10 +7,13 @@
     "dev": "cross-env NODE_ENV=development tsx server/index.ts",
     "build": "npm run build:server",
     "build:server": "node build.mjs",
-    "start": "node api/index.js",
+    "start": "node api/index.mjs",
     "check": "tsc",
     "db:push": "drizzle-kit push",
     "db:seed": "tsx server/seed.ts"
+  },
+  "engines": {
+    "node": ">=18"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

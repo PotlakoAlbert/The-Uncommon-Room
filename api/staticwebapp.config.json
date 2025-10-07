@@ -1,0 +1,15 @@
+{
+  "route": "/api/*",
+  "methods": ["GET", "POST", "PUT", "DELETE"],
+  "rewrite": "/api/index.mjs",
+  "headers": {
+    "Access-Control-Allow-Credentials": "true"
+  },
+  "environmentVariables": {
+    "AZURE_STORAGE_CONNECTION_STRING": "@AZURE_STORAGE_CONNECTION_STRING",
+    "JWT_SECRET": "@JWT_SECRET",
+    "DATABASE_URL": "@DATABASE_URL",
+    "VITE_API_URL": "@VITE_API_URL",
+    "VITE_STORAGE_URL": "@VITE_STORAGE_URL"
+  }
+}

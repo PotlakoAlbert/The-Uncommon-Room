@@ -25,12 +25,29 @@ jobs:
         with:
           node-version: '18'
 
-      - name: Install and Build API
+      - name: Install API Dependencies
+        working-directory: ./api
+        run: |
+          npm install
+
+      - name: Create Environment Files
+        run: |
+          # Create API environment file
+          echo "AZURE_STORAGE_CONNECTION_STRING=${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}" > api/.env
+          echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> api/.env
+          echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> api/.env
+          echo "NODE_ENV=production" >> api/.env
+          
+          # Create Client environment file
+          echo "VITE_API_URL=${{ secrets.VITE_API_URL }}" > client/.env
+          echo "VITE_STORAGE_URL=${{ secrets.VITE_STORAGE_URL }}" >> client/.env
+
+      - name: Build API
         run: |
           npm install
           npm run build:server
 
-      - name: Install and Build Client
+      - name: Build Client
         working-directory: ./client
         run: |
           npm install
@@ -39,6 +56,12 @@ jobs:
       - name: Deploy
         id: builddeploy
         uses: Azure/static-web-apps-deploy@v1
+        env:
+          AZURE_STORAGE_CONNECTION_STRING: ${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          VITE_STORAGE_URL: ${{ secrets.VITE_STORAGE_URL }}
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
@@ -47,11 +70,8 @@ jobs:
           api_location: "api"
           output_location: "dist"
           app_artifact_location: "client/dist"
-          api_build_command: "npm run build:server"
-          app_build_command: "npm run build"
+          skip_api_build: true
           skip_app_build: false
-          skip_api_build: false
-          deployment_environment: "production"
 
   close_pull_request_job:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'

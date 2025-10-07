@@ -1,4 +1,14 @@
 {
+  "name": "uncommon-furniture-api",
+  "version": "1.0.0",
   "main": "index.mjs",
-  "type": "module"
+  "type": "module",
+  "scripts": {
+    "build": "node ../build.mjs",
+    "build:server": "node ../build.mjs"
+  },
+  "dependencies": {
+    "@babel/preset-typescript": "^7.23.2",
+    "lightningcss": "^1.22.1"
+  }
 }

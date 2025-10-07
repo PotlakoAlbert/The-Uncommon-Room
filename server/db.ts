@@ -101,66 +101,58 @@ async function createPool(): Promise<Pool> {
   }
 }
 
-// Lazy initialization for the connection pool
-let pool: Pool | null = null;
-let drizzleDb: any = null;
+// Immediate initialization with error handling
+let poolInstance: Pool;
+let dbInstance: any;
 
 async function initializeDatabase() {
-  if (pool && drizzleDb) {
-    return { pool, db: drizzleDb };
+  if (poolInstance && dbInstance) {
+    return { pool: poolInstance, db: dbInstance };
   }
 
   try {
-    pool = await createPool();
-    drizzleDb = drizzle(pool, { 
+    poolInstance = await createPool();
+    dbInstance = drizzle(poolInstance, { 
       schema,
       logger: process.env.NODE_ENV !== 'production'
     });
     
-    return { pool, db: drizzleDb };
+    console.log('✅ Database initialized successfully');
+    return { pool: poolInstance, db: dbInstance };
   } catch (error) {
-    console.error('Failed to create database pool:', error);
+    console.error('❌ Failed to initialize database:', error);
     throw error;
   }
 }
 
-// Export lazy-initialized database connection
+// Initialize immediately
+const dbPromise = initializeDatabase();
+
+// Export synchronous db and pool for backwards compatibility
+export let db: any;
+export let pool: Pool;
+
+// Initialize and set the exports
+dbPromise.then(({ db: initializedDb, pool: initializedPool }) => {
+  db = initializedDb;
+  pool = initializedPool;
+}).catch(error => {
+  console.error('Database initialization failed:', error);
+  // Set a proxy that will retry initialization on each use
+  db = new Proxy({} as any, {
+    get(target, prop) {
+      throw new Error(`Database not initialized: ${String(prop)}. Original error: ${error.message}`);
+    }
+  });
+});
+
+// Export functions for explicit initialization
 export async function getDb() {
-  const { db } = await initializeDatabase();
+  const { db } = await dbPromise;
   return db;
 }
 
 export async function getPool() {
-  const { pool } = await initializeDatabase();
+  const { pool } = await dbPromise;
   return pool;
 }
-
-// For backwards compatibility, export a promise-based db
-export const db = {
-  async query(...args: any[]) {
-    const database = await getDb();
-    return database.query(...args);
-  },
-  async select(...args: any[]) {
-    const database = await getDb();
-    return database.select(...args);
-  },
-  async insert(...args: any[]) {
-    const database = await getDb();
-    return database.insert(...args);
-  },
-  async update(...args: any[]) {
-    const database = await getDb();
-    return database.update(...args);
-  },
-  async delete(...args: any[]) {
-    const database = await getDb();
-    return database.delete(...args);
-  },
-  get transaction() {
-    return async (callback: any) => {
-      const database = await getDb();
-      return database.transaction(callback);
-    };
-  }
-};

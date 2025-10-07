@@ -118,6 +118,24 @@ app.use((req, res, next) => {
   // Test database connection first
   await testDatabase();
   
+  // Simple health check endpoint
+  app.get('/health', (req, res) => {
+    res.json({ 
+      status: 'healthy', 
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || 'unknown'
+    });
+  });
+
+  // Root endpoint
+  app.get('/', (req, res) => {
+    res.json({ 
+      message: 'UncommonFurniture API Server',
+      status: 'running',
+      timestamp: new Date().toISOString()
+    });
+  });
+
   await registerRoutes(app);
   const server = await initDevDependencies(app);
 

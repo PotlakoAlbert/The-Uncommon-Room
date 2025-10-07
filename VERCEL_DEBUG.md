@@ -1,40 +1,56 @@
-# Environment Variables Configuration
+# Vercel Deployment Configuration
 
-## Current Issue
-The registration is failing because the URL is being constructed as:
-`https://web-production-b8bea.up.railway.app/api/api/auth/register` (double `/api`)
+## Issues Fixed
 
-## Root Cause
-Vercel environment variable `VITE_API_URL` is probably still set to include `/api` suffix.
+### 1. SPA Routing Issue ✅
+**Problem**: Direct navigation to routes like `/admin/login`, `/products`, etc. returned 404 errors
+**Root Cause**: Vercel was trying to find physical files instead of serving the SPA
+**Solution**: Updated `vercel.json` with proper rewrites configuration
 
-## Solution
+### 2. API Proxy Configuration ✅
+**Problem**: API calls from frontend were not reaching Railway backend
+**Root Cause**: Missing API proxy configuration in Vercel
+**Solution**: Added API rewrites to proxy requests to Railway
 
-### Option 1: Fix Vercel Environment Variable (Recommended)
-In your Vercel dashboard:
-1. Go to your project settings
-2. Navigate to Environment Variables
-3. Set `VITE_API_URL` to: `https://web-production-b8bea.up.railway.app`
-4. Remove any trailing `/api` from the value
-5. Redeploy
+### 3. Environment Variable URL Construction ✅
+**Problem**: Double `/api` in URLs causing 404s
+**Root Cause**: VITE_API_URL configuration inconsistency
+**Solution**: Robust URL construction handling both configurations
 
-### Option 2: Code Already Handles Both Cases
-The updated code now strips `/api` from the baseURL automatically, so it should work regardless of how the environment variable is set.
+## Current Configuration
+
+### vercel.json
+```json
+{
+  "buildCommand": "cd client && npm install && npm run build",
+  "outputDirectory": "client/dist",
+  "framework": "vite",
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "https://web-production-b8bea.up.railway.app/api/$1"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
+```
+
+### How It Works
+1. **API Requests**: `/api/*` → Proxied to Railway backend
+2. **All Other Routes**: `/*` → Served `index.html` (SPA routing)
+3. **Direct Navigation**: Works for all routes (`/admin/login`, `/products`, etc.)
+
+## Environment Variables
+Set in Vercel dashboard:
+- `VITE_API_URL` = `https://web-production-b8bea.up.railway.app` (without `/api`)
 
 ## Testing URLs
-With the fix, both of these configurations should work:
-
-**Configuration A (Recommended):**
-- `VITE_API_URL=https://web-production-b8bea.up.railway.app`
-- Results in: `https://web-production-b8bea.up.railway.app/api/auth/register` ✅
-
-**Configuration B (Legacy - now handled):**
-- `VITE_API_URL=https://web-production-b8bea.up.railway.app/api`
-- Code strips `/api` and results in: `https://web-production-b8bea.up.railway.app/api/auth/register` ✅
-
-## Debug Information
-The browser console will now show:
-- Base URL from environment
-- Request URL path
-- Final constructed URL
-
-Check these logs to verify the URL construction is working correctly.
+All these should now work:
+- ✅ `https://the-uncommon-room-duyr.vercel.app/`
+- ✅ `https://the-uncommon-room-duyr.vercel.app/products`
+- ✅ `https://the-uncommon-room-duyr.vercel.app/admin/login`
+- ✅ `https://the-uncommon-room-duyr.vercel.app/register`
+- ✅ API calls proxied to Railway backend

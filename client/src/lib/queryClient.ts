@@ -24,6 +24,11 @@ export async function apiRequest(
   if (!token) {
     token = localStorage.getItem('token');
     console.log('[apiRequest] Token from localStorage:', token ? 'present' : 'missing');
+    if (token) {
+      console.log('[apiRequest] Token preview:', token.substring(0, 20) + '...');
+    }
+  } else {
+    console.log('[apiRequest] Token from Redux store:', token.substring(0, 20) + '...');
   }
   
   const isCartEndpoint = url.includes('/api/cart');
@@ -61,33 +66,74 @@ export async function apiRequest(
     fullUrl = `${cleanBaseURL}${url}`;
   }
   
+  console.log('[apiRequest] Environment VITE_API_URL:', import.meta.env.VITE_API_URL || 'undefined');
   console.log('[apiRequest] Base URL:', baseURL);
   console.log('[apiRequest] Request URL:', url);
   console.log('[apiRequest] Full URL:', fullUrl);
-  const res = await fetch(fullUrl, {
-    method,
-    headers,
-    body: data ? (isFormData ? (data as FormData) : JSON.stringify(data)) : undefined,
-    credentials: "include",
-  });
+  console.log('[apiRequest] Method:', method);
+  console.log('[apiRequest] Headers:', headers);
+  console.log('[apiRequest] Data:', data ? JSON.stringify(data).substring(0, 100) + '...' : 'none');
 
-  // For cart endpoints, handle 401/403 gracefully
-  if (isCartEndpoint && (res.status === 401 || res.status === 403)) {
-    // Optionally, clear token and mark as unauthenticated
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    // Optionally, dispatch logout or show toast
-    // Return a dummy empty response or throw
+  try {
+    const res = await fetch(fullUrl, {
+      method,
+      headers,
+      body: data ? (isFormData ? (data as FormData) : JSON.stringify(data)) : undefined,
+      credentials: "include",
+    });
+
+    console.log('[apiRequest] Response status:', res.status, res.statusText);
+    console.log('[apiRequest] Response headers:', Object.fromEntries(res.headers.entries()));
+    
+    // For cart endpoints, handle 401/403 gracefully
+    if (isCartEndpoint && (res.status === 401 || res.status === 403)) {
+      console.warn('[apiRequest] Cart endpoint returned 401/403, clearing auth');
+      // Optionally, clear token and mark as unauthenticated
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      return res;
+    }
+
+    // Don't throw on 401 if explicitly requested (useful for cart requests)
+    if (res.status === 401 && options?.throwOn401 === false) {
+      console.warn('[apiRequest] 401 response, but not throwing due to throwOn401: false');
+      return res;
+    }
+
+    // Check if response is ok before proceeding
+    if (!res.ok) {
+      const errorText = await res.text().catch(() => 'Unable to read error response');
+      console.error('[apiRequest] Request failed:', {
+        status: res.status,
+        statusText: res.statusText,
+        url: fullUrl,
+        method,
+        errorText
+      });
+      throw new Error(`${res.status}: ${errorText || res.statusText}`);
+    }
+
+    console.log('[apiRequest] Request successful');
     return res;
+  } catch (error) {
+    console.error('[apiRequest] Fetch error:', {
+      error: error instanceof Error ? error.message : error,
+      url: fullUrl,
+      method,
+      type: error instanceof Error ? error.constructor.name : typeof error
+    });
+    
+    // Check if it's a network error
+    if (error instanceof TypeError && error.message === 'Failed to fetch') {
+      console.error('[apiRequest] Network error - possible causes:');
+      console.error('1. CORS policy blocking the request');
+      console.error('2. Server is down or unreachable');
+      console.error('3. Network connectivity issues');
+      console.error('4. SSL/TLS certificate issues');
+    }
+    
+    throw error;
   }
-
-  // Don't throw on 401 if explicitly requested (useful for cart requests)
-  if (res.status === 401 && options?.throwOn401 === false) {
-    return res;
-  }
-
-  await throwIfResNotOk(res);
-  return res;
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";

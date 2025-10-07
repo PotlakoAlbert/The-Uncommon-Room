@@ -41,7 +41,23 @@ function Router() {
   // Only fetch if user is authenticated and cart is not already authenticated
   useEffect(() => {
     const token = localStorage.getItem('token');
-    console.log('[App] Initial load - Auth status:', isAuthenticated, 'Cart auth status:', cartIsAuthenticated, 'Token exists:', !!token);
+    const user = localStorage.getItem('user');
+    const allLocalStorageKeys = Object.keys(localStorage);
+    
+    console.log('[App] === INITIAL LOAD DEBUG ===');
+    console.log('[App] Auth status:', isAuthenticated);
+    console.log('[App] Cart auth status:', cartIsAuthenticated);
+    console.log('[App] Token exists:', !!token);
+    console.log('[App] Token preview:', token ? token.substring(0, 20) + '...' : 'null');
+    console.log('[App] User exists:', !!user);
+    console.log('[App] User data:', user ? JSON.parse(user) : 'null');
+    console.log('[App] All localStorage keys:', allLocalStorageKeys);
+    console.log('[App] Current URL:', window.location.href);
+    console.log('[App] Environment:', {
+      NODE_ENV: process.env.NODE_ENV,
+      VITE_API_URL: import.meta.env.VITE_API_URL
+    });
+    console.log('[App] === END DEBUG ===');
     
     if ((isAuthenticated || token) && !cartIsAuthenticated) {
       console.log('[App] Fetching server cart on initialization');

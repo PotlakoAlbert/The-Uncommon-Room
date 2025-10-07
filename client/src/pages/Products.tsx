@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import ProductCard from "@/components/ProductCard";
@@ -8,6 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiRequest } from "@/lib/queryClient";
+import { testNetworkConnectivity, testBackendHealth } from "@/lib/networkDebug";
 
 export default function Products() {
   const [, setLocation] = useLocation();
@@ -21,6 +22,13 @@ export default function Products() {
   const [sortBy, setSortBy] = useState("featured");
   const [viewMode, setViewMode] = useState("grid");
 
+  // Run network connectivity tests on component mount
+  useEffect(() => {
+    console.log('[Products] Component mounted, running network tests...');
+    testNetworkConnectivity();
+    testBackendHealth();
+  }, []);
+
   const { data: products, isLoading, error } = useQuery({
     queryKey: ['/api/products', filters],
     queryFn: async () => {
@@ -29,12 +37,41 @@ export default function Products() {
         if (value) params.append(key, value);
       });
       
-      console.log('[Products] Fetching products with filters:', filters);
-      const response = await apiRequest('GET', `/api/products?${params}`, undefined, { throwOn401: false });
-      const data = await response.json();
-      console.log('[Products] Fetched products:', data);
-      return data;
+      console.log('[Products] === FETCHING PRODUCTS ===');
+      console.log('[Products] Filters:', filters);
+      console.log('[Products] Query params:', params.toString());
+      console.log('[Products] Environment VITE_API_URL:', import.meta.env.VITE_API_URL);
+      
+      try {
+        const response = await apiRequest('GET', `/api/products?${params}`, undefined, { throwOn401: false });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('[Products] Response not OK:', {
+            status: response.status,
+            statusText: response.statusText,
+            errorText
+          });
+          throw new Error(`HTTP ${response.status}: ${errorText || response.statusText}`);
+        }
+        
+        const data = await response.json();
+        console.log('[Products] ✅ Successfully fetched products:', {
+          count: Array.isArray(data) ? data.length : 'not an array',
+          data: data
+        });
+        return data;
+      } catch (error) {
+        console.error('[Products] ❌ Fetch failed:', {
+          error: error instanceof Error ? error.message : error,
+          type: error instanceof Error ? error.constructor.name : typeof error,
+          stack: error instanceof Error ? error.stack : undefined
+        });
+        throw error;
+      }
     },
+    retry: false, // Disable retry for better debugging
+    staleTime: 0, // Always fetch fresh data
   });
 
   const handleFilterChange = (key: string, value: string | boolean) => {

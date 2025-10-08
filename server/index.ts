@@ -42,7 +42,9 @@ console.log('Server startup environment check:', {
   NODE_ENV: process.env.NODE_ENV,
   DATABASE_URL_SET: !!process.env.DATABASE_URL,
   DATABASE_URL_TYPE: typeof process.env.DATABASE_URL,
-  ALL_ENV_KEYS: Object.keys(process.env).filter(key => key.includes('DATABASE')),
+  JWT_SECRET_SET: !!process.env.JWT_SECRET,
+  JWT_SECRET_LENGTH: process.env.JWT_SECRET?.length || 0,
+  ALL_ENV_KEYS: Object.keys(process.env).filter(key => key.includes('DATABASE') || key.includes('JWT')),
 });
 
 // Test database initialization

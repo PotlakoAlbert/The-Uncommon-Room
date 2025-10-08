@@ -86,6 +86,9 @@ const { token: accessToken, token: refreshToken } = await generateTokens(user);
     });
   } catch (error) {
     console.error('[Auth] Registration error:', error);
+    console.error('[Auth] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+    console.error('[Auth] Error name:', error instanceof Error ? error.name : 'Unknown error type');
+    console.error('[Auth] Error message:', error instanceof Error ? error.message : String(error));
     
     if (error instanceof z.ZodError) {
       console.error('[Auth] Validation errors:', error.errors);
@@ -95,7 +98,19 @@ const { token: accessToken, token: refreshToken } = await generateTokens(user);
       });
     }
     
-    res.status(400).json({ message: "Invalid input" });
+    // Check for specific database or JWT errors
+    if (error instanceof Error) {
+      if (error.message.includes('JWT_SECRET')) {
+        console.error('[Auth] JWT configuration error');
+        return res.status(500).json({ message: "Server configuration error" });
+      }
+      if (error.message.includes('database') || error.message.includes('connection')) {
+        console.error('[Auth] Database connection error');
+        return res.status(500).json({ message: "Database connection error" });
+      }
+    }
+    
+    res.status(500).json({ message: "Registration failed", error: error instanceof Error ? error.message : "Unknown error" });
   }
 });
 
@@ -140,6 +155,7 @@ router.post("/login", async (req, res) => {
     });
   } catch (error) {
     console.error('[Auth] Login error:', error);
+    console.error('[Auth] Login error stack:', error instanceof Error ? error.stack : 'No stack trace');
     
     if (error instanceof z.ZodError) {
       console.error('[Auth] Login validation errors:', error.errors);
@@ -149,7 +165,19 @@ router.post("/login", async (req, res) => {
       });
     }
     
-    res.status(400).json({ message: "Invalid input" });
+    // Check for specific errors
+    if (error instanceof Error) {
+      if (error.message.includes('JWT_SECRET')) {
+        console.error('[Auth] JWT configuration error in login');
+        return res.status(500).json({ message: "Server configuration error" });
+      }
+      if (error.message.includes('database') || error.message.includes('connection')) {
+        console.error('[Auth] Database connection error in login');
+        return res.status(500).json({ message: "Database connection error" });
+      }
+    }
+    
+    res.status(500).json({ message: "Login failed", error: error instanceof Error ? error.message : "Unknown error" });
   }
 });
 

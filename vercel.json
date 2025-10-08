@@ -1,37 +1,15 @@
 {
-  "version": 2,
-  "builds": [
-    {
-      "src": "client/package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "dist"
-      }
-    }
-  ],
+  "buildCommand": "cd client && npm install && npm run build",
+  "outputDirectory": "client/dist",
+  "installCommand": "cd client && npm install",
   "rewrites": [
     {
       "source": "/api/(.*)",
       "destination": "https://web-production-b8bea.up.railway.app/api/$1"
     },
     {
-      "source": "/((?!api|assets|favicon\\.ico|.*\\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot)).*)",
-      "destination": "/index.html"
-    }
-  ],
-  "headers": [
-    {
       "source": "/(.*)",
-      "headers": [
-        {
-          "key": "X-Frame-Options",
-          "value": "DENY"
-        },
-        {
-          "key": "X-Content-Type-Options",
-          "value": "nosniff"
-        }
-      ]
+      "destination": "/index.html"
     }
   ]
 }

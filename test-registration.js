@@ -3,8 +3,8 @@ console.log('[Test] Testing Railway backend registration API...');
 
 const testRegistration = async () => {
   const testData = {
-    name: "Test User",
-    email: "test123@example.com",
+    name: "Test User New",
+    email: `test${Date.now()}@example.com`, // Use timestamp to ensure unique email
     password: "testpass123",
     phone: "+27123456789",
     address: "123 Test Street"

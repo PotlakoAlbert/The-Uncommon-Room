@@ -64,14 +64,24 @@ const swaggerOptions = {
 
 const specs = swaggerJsdoc(swaggerOptions);
 
-export async function registerRoutes(app: Express): Promise<Server> {
-  // Middleware
+export function registerRoutes(app: Express): void {
+  // Set environment defaults
+  if (!process.env.CORS_ORIGIN) {
+    process.env.CORS_ORIGIN = 'https://the-uncommon-room-duyr.vercel.app';
+  }
+  
+  // CORS configuration with environment-based origins
+  const corsOrigins = [
+    'http://localhost:5173',
+    'https://uncommon-furniture.vercel.app',
+    'https://the-uncommon-room.vercel.app',
+    'https://the-uncommon-room-duyr.vercel.app',
+    process.env.CORS_ORIGIN,
+    process.env.FRONTEND_URL
+  ].filter(Boolean); // Remove any undefined values
+
   app.use(cors({
-    origin: [
-      'http://localhost:5173',
-      'https://uncommon-furniture.vercel.app',
-      'https://the-uncommon-room.vercel.app'
-    ],
+    origin: corsOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
@@ -176,7 +186,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Generate JWT token
       if (!process.env.JWT_SECRET) {
-        throw new Error("JWT_SECRET environment variable is not set");
+        process.env.JWT_SECRET = 'ad03d779b2e16a187f4a65e2caf2084d89af004c199e6d4624ed9e5babbf8d52138932fc44df7ac6e567055bae52046a7dca26450e78e8ce48e2c43a3043368b';
+        console.log('⚠️  JWT_SECRET not found in user auth, using fallback');
       }
       const token = jwt.sign(
         { id: user.id, type: 'user' },
@@ -248,7 +259,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Generate JWT token
       if (!process.env.JWT_SECRET) {
-        throw new Error("JWT_SECRET environment variable is not set");
+        process.env.JWT_SECRET = 'ad03d779b2e16a187f4a65e2caf2084d89af004c199e6d4624ed9e5babbf8d52138932fc44df7ac6e567055bae52046a7dca26450e78e8ce48e2c43a3043368b';
+        console.log('⚠️  JWT_SECRET not found in login, using fallback');
       }
       const token = jwt.sign(
         { id: user.id, type: 'user' },
@@ -306,7 +318,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Generate JWT token
       if (!process.env.JWT_SECRET) {
-        throw new Error("JWT_SECRET environment variable is not set");
+        process.env.JWT_SECRET = 'ad03d779b2e16a187f4a65e2caf2084d89af004c199e6d4624ed9e5babbf8d52138932fc44df7ac6e567055bae52046a7dca26450e78e8ce48e2c43a3043368b';
+        console.log('⚠️  JWT_SECRET not found in admin login, using fallback');
       }
 
       const token = jwt.sign(

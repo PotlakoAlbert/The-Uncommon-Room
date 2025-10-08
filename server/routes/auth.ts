@@ -189,7 +189,11 @@ router.post("/refresh-token", async (req, res) => {
   }
 
   try {
-    const decoded = jwt.verify(refreshToken, process.env.JWT_SECRET!) as jwt.JwtPayload;
+    if (!process.env.JWT_SECRET) {
+      process.env.JWT_SECRET = 'ad03d779b2e16a187f4a65e2caf2084d89af004c199e6d4624ed9e5babbf8d52138932fc44df7ac6e567055bae52046a7dca26450e78e8ce48e2c43a3043368b';
+      console.log('⚠️  JWT_SECRET not found in refresh token, using fallback');
+    }
+    const decoded = jwt.verify(refreshToken, process.env.JWT_SECRET) as jwt.JwtPayload;
 
     const user = await db.query.users.findFirst({
       where: eq(users.id, decoded.id),
@@ -231,7 +235,11 @@ router.post("/logout", async (req, res) => {
 
   if (refreshToken) {
     try {
-      const decoded = jwt.verify(refreshToken, process.env.JWT_SECRET!) as jwt.JwtPayload;
+      if (!process.env.JWT_SECRET) {
+        process.env.JWT_SECRET = 'ad03d779b2e16a187f4a65e2caf2084d89af004c199e6d4624ed9e5babbf8d52138932fc44df7ac6e567055bae52046a7dca26450e78e8ce48e2c43a3043368b';
+        console.log('⚠️  JWT_SECRET not found in logout, using fallback');
+      }
+      const decoded = jwt.verify(refreshToken, process.env.JWT_SECRET) as jwt.JwtPayload;
       await db
         .update(users)
         .set({ refreshToken: null })

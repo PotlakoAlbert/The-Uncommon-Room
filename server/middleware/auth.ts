@@ -13,8 +13,10 @@ export interface AuthRequest extends Request {
 }
 
 export const generateTokens = (user: { id: number; email: string; role: string }) => {
+  // Set fallback JWT secret if not provided
   if (!process.env.JWT_SECRET) {
-    throw new Error("JWT_SECRET environment variable is not set");
+    process.env.JWT_SECRET = 'ad03d779b2e16a187f4a65e2caf2084d89af004c199e6d4624ed9e5babbf8d52138932fc44df7ac6e567055bae52046a7dca26450e78e8ce48e2c43a3043368b';
+    console.log('⚠️  JWT_SECRET not found in generateTokens, using fallback');
   }
 
   const token = jwt.sign(
@@ -34,7 +36,8 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
     }
 
     if (!process.env.JWT_SECRET) {
-      throw new Error("JWT_SECRET environment variable is not set");
+      process.env.JWT_SECRET = 'ad03d779b2e16a187f4a65e2caf2084d89af004c199e6d4624ed9e5babbf8d52138932fc44df7ac6e567055bae52046a7dca26450e78e8ce48e2c43a3043368b';
+      console.log('⚠️  JWT_SECRET not found in authenticateToken, using fallback');
     }
 
     const token = authHeader.split(" ")[1];

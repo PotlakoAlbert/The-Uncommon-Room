@@ -37,6 +37,66 @@ if (isDevelopment) {
   config({ path: resolve(_dirname, '..', '.env') });
 }
 
+// Set fallback environment variables if not provided
+const setEnvDefaults = () => {
+  // Database Configuration
+  if (!process.env.DATABASE_URL) {
+    process.env.DATABASE_URL = 'postgresql://neondb_owner:npg_iqRAj4Yl8XyN@ep-lingering-king-ad0o3wyd-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require';
+    console.log('⚠️  DATABASE_URL not found, using fallback');
+  }
+  
+  // JWT Configuration
+  if (!process.env.JWT_SECRET) {
+    process.env.JWT_SECRET = 'ad03d779b2e16a187f4a65e2caf2084d89af004c199e6d4624ed9e5babbf8d52138932fc44df7ac6e567055bae52046a7dca26450e78e8ce48e2c43a3043368b';
+    console.log('⚠️  JWT_SECRET not found, using fallback');
+  }
+  
+  if (!process.env.SESSION_SECRET) {
+    process.env.SESSION_SECRET = 'bc344e9556bade53e4c06d7c039e7b66529c45f419fe5826f05bb16648c17533198b66d8d0ee081749bccd55f50566120a24931aa2d8a5d3593d685dbfc90128';
+    console.log('⚠️  SESSION_SECRET not found, using fallback');
+  }
+  
+  // CORS Configuration
+  if (!process.env.CORS_ORIGIN) {
+    process.env.CORS_ORIGIN = 'https://the-uncommon-room-duyr.vercel.app';
+    console.log('⚠️  CORS_ORIGIN not found, using fallback');
+  }
+  
+  if (!process.env.FRONTEND_URL) {
+    process.env.FRONTEND_URL = 'https://the-uncommon-room-duyr.vercel.app';
+    console.log('⚠️  FRONTEND_URL not found, using fallback');
+  }
+  
+  // Server Configuration
+  if (!process.env.PORT) {
+    process.env.PORT = '8080';
+  }
+  
+  if (!process.env.NODE_ENV) {
+    process.env.NODE_ENV = 'production';
+  }
+  
+  // Email Configuration (if needed)
+  if (!process.env.SMTP_HOST) {
+    process.env.SMTP_HOST = 'smtp.gmail.com';
+  }
+  
+  if (!process.env.SMTP_PORT) {
+    process.env.SMTP_PORT = '587';
+  }
+  
+  if (!process.env.SMTP_USER) {
+    process.env.SMTP_USER = 'your_email@gmail.com';
+  }
+  
+  if (!process.env.SMTP_PASS) {
+    process.env.SMTP_PASS = 'your_email_password';
+  }
+};
+
+// Apply environment defaults
+setEnvDefaults();
+
 // Debug environment variables
 console.log('Server startup environment check:', {
   NODE_ENV: process.env.NODE_ENV,

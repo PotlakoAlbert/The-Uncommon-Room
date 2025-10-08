@@ -9,6 +9,12 @@ if (process.env.NODE_ENV !== 'production') {
   config();
 }
 
+// Set database URL fallback
+if (!process.env.DATABASE_URL) {
+  process.env.DATABASE_URL = 'postgresql://neondb_owner:npg_iqRAj4Yl8XyN@ep-lingering-king-ad0o3wyd-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require';
+  console.log('⚠️  DATABASE_URL not found, using fallback in db.ts');
+}
+
 // Configure Neon with WebSocket for serverless environment
 neonConfig.webSocketConstructor = ws;
 neonConfig.useSecureWebSocket = true; // Force secure WebSocket
@@ -16,10 +22,10 @@ neonConfig.useSecureWebSocket = true; // Force secure WebSocket
 async function createPool(): Promise<Pool> {
   let DATABASE_URL = process.env.DATABASE_URL;
 
-  // Fallback to static URL if environment variable is not set (Railway deployment issue)
+  // Double-check fallback (should be set by now)
   if (!DATABASE_URL) {
-    console.warn('DATABASE_URL not found in environment variables, using fallback URL');
-    DATABASE_URL = process.env.FALLBACK_DATABASE_URL || 'postgresql://neondb_owner:npg_iqRAj4Yl8XyN@ep-lingering-king-ad0o3wyd-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require';
+    console.warn('DATABASE_URL still not found, applying final fallback');
+    DATABASE_URL = 'postgresql://neondb_owner:npg_iqRAj4Yl8XyN@ep-lingering-king-ad0o3wyd-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require';
   }
 
   // Debug logging

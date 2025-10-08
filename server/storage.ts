@@ -12,8 +12,6 @@ import {
   deliveries,
   type Product,
   type InsertProduct,
-  type Admin,
-  type InsertAdmin,
   type Cart,
   type CartItem,
   type InsertCartItem,
@@ -31,6 +29,10 @@ import {
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, asc, like, gte, lte, sql } from "drizzle-orm";
+
+// Define Admin types since they're missing from schema
+type Admin = typeof admins.$inferSelect;
+type InsertAdmin = typeof admins.$inferInsert;
 
 export interface IStorage {
   // User operations
@@ -487,15 +489,42 @@ export class DatabaseStorage implements IStorage {
     return newRequest;
   }
 
-  async getAllCustomDesignRequests(): Promise<({
-    custom_design_requests: CustomDesignRequest & { designId: number };
-    users: User;
-  })[]> {
-    return await db
-      .select()
+  async getAllCustomDesignRequests(): Promise<(CustomDesignRequest & { user: User })[]> {
+    const result = await db
+      .select({
+        id: customDesignRequests.id,
+        userId: customDesignRequests.userId,
+        furnitureType: customDesignRequests.furnitureType,
+        dimensions: customDesignRequests.dimensions,
+        materialPreference: customDesignRequests.materialPreference,
+        colorPreference: customDesignRequests.colorPreference,
+        specialRequirements: customDesignRequests.specialRequirements,
+        referenceImages: customDesignRequests.referenceImages,
+        referenceLinks: customDesignRequests.referenceLinks,
+        budgetRange: customDesignRequests.budgetRange,
+        status: customDesignRequests.status,
+        quoteAmount: customDesignRequests.quoteAmount,
+        createdAt: customDesignRequests.createdAt,
+        updatedAt: customDesignRequests.updatedAt,
+        user: {
+          id: users.id,
+          name: users.name,
+          email: users.email,
+          passwordHash: users.passwordHash,
+          role: users.role,
+          phone: users.phone,
+          address: users.address,
+          refreshToken: users.refreshToken,
+          adminId: users.adminId,
+          createdAt: users.createdAt,
+          updatedAt: users.updatedAt,
+        }
+      })
       .from(customDesignRequests)
       .innerJoin(users, eq(customDesignRequests.userId, users.id))
-      .orderBy(desc(customDesignRequests.createdAt)) as any;
+      .orderBy(desc(customDesignRequests.createdAt));
+    
+    return result as (CustomDesignRequest & { user: User })[];
   }
 
   async updateCustomDesignStatus(id: number, status: string, quoteAmount?: string): Promise<CustomDesignRequest> {
@@ -660,7 +689,7 @@ export class DatabaseStorage implements IStorage {
       const inventoryCount = await db
         .select({ count: sql`count(*)` })
         .from(inventory)
-        .then(result => Number(result[0].count));
+        .then((result: Array<{ count: string | number }>) => Number(result[0].count));
         
       console.log(`Found ${inventoryCount} inventory records`);
       
@@ -691,7 +720,7 @@ export class DatabaseStorage implements IStorage {
         };
         
         // Create normalized inventory data from products
-        const inventoryData = productsData.map(product => ({
+        const inventoryData = productsData.map((product: any) => ({
           productId: parseNumber(product.productId),
           name: typeof product.name === 'string' ? product.name : 'Unknown',
           category: typeof product.category === 'string' ? product.category : 'N/A',
@@ -747,7 +776,7 @@ export class DatabaseStorage implements IStorage {
       }
       
       // Normalize all inventory data to ensure consistent types
-      const normalizedInventory = inventoryData.map(item => ({
+      const normalizedInventory = inventoryData.map((item: any) => ({
         productId: parseNumber(item.productId),
         name: typeof item.name === 'string' ? item.name : 'Unknown',
         category: typeof item.category === 'string' ? item.category : 'N/A',
@@ -761,10 +790,10 @@ export class DatabaseStorage implements IStorage {
         console.log('Sample inventory item (normalized):', JSON.stringify(normalizedInventory[0]));
       }
 
-      const lowStockItems = normalizedInventory.filter(item => item.quantity <= 5 && item.quantity > 0);
-      const outOfStockItems = normalizedInventory.filter(item => item.quantity === 0);
+      const lowStockItems = normalizedInventory.filter((item: any) => item.quantity <= 5 && item.quantity > 0);
+      const outOfStockItems = normalizedInventory.filter((item: any) => item.quantity === 0);
 
-      const totalValue = normalizedInventory.reduce((sum, item) => {
+      const totalValue = normalizedInventory.reduce((sum: number, item: any) => {
         return sum + (item.price * item.quantity);
       }, 0);
 
@@ -884,7 +913,7 @@ export class DatabaseStorage implements IStorage {
       const designCount = await db
         .select({ count: sql`count(*)` })
         .from(customDesignRequests)
-        .then(result => Number(result[0].count));
+        .then((result: Array<{ count: string | number }>) => Number(result[0].count));
         
       console.log(`Found ${designCount} custom design requests`);
       
@@ -929,15 +958,14 @@ export class DatabaseStorage implements IStorage {
         const customDesignsDataPromise = db
           .select({
             id: customDesignRequests.id,
-            designId: customDesignRequests.designId,
             customer_name: users.name,
             customer_email: users.email,
             status: customDesignRequests.status,
-            description: customDesignRequests.description,
+            furniture_type: customDesignRequests.furnitureType,
+            special_requirements: customDesignRequests.specialRequirements,
             budget: customDesignRequests.budgetRange,
-            timeline: customDesignRequests.materialPreference, // Use as timeline approximation
-            // Only include referenceLinks if it exists in the schema
-            ...(hasReferenceLinks ? { reference_links: customDesignRequests.referenceLinks } : {}),
+            material_preference: customDesignRequests.materialPreference,
+            reference_links: customDesignRequests.referenceLinks,
             created_at: customDesignRequests.createdAt,
           })
           .from(customDesignRequests)
@@ -948,7 +976,7 @@ export class DatabaseStorage implements IStorage {
         // Legacy format - kept for backward compatibility
         const recentRequestsPromise = db
           .select({
-            designId: customDesignRequests.designId,
+            designId: customDesignRequests.id, // Use id instead of designId
             customerName: users.name,
             furnitureType: customDesignRequests.furnitureType,
             status: customDesignRequests.status,
@@ -971,10 +999,10 @@ export class DatabaseStorage implements IStorage {
         console.log(`Retrieved ${customDesignsData.length} custom design records`);
 
         // Count totals by status
-        const pendingRequests = statusCounts.find(s => s.status === 'pending')?.count || 0;
-        const approvedRequests = statusCounts.find(s => s.status === 'approved')?.count || 0;
-        const rejectedRequests = statusCounts.find(s => s.status === 'rejected')?.count || 0;
-        const totalRequests = statusCounts.reduce((sum, item) => sum + Number(item.count), 0);
+        const pendingRequests = statusCounts.find((s: any) => s.status === 'pending')?.count || 0;
+        const approvedRequests = statusCounts.find((s: any) => s.status === 'approved')?.count || 0;
+        const rejectedRequests = statusCounts.find((s: any) => s.status === 'rejected')?.count || 0;
+        const totalRequests = statusCounts.reduce((sum: number, item: any) => sum + Number(item.count), 0);
 
         // Format data according to both new and legacy formats
         return {
@@ -983,7 +1011,7 @@ export class DatabaseStorage implements IStorage {
           pendingRequests,
           approvedRequests,
           rejectedRequests,
-          customDesignsData: customDesignsData.map(item => {
+          customDesignsData: customDesignsData.map((item: any) => {
             // Use either id or designId
             const id = item.id || item.designId || 0;
             return {
@@ -1019,7 +1047,7 @@ export class DatabaseStorage implements IStorage {
           
         const customDesignsData = await db
           .select({
-            id: customDesignRequests.designId,
+            id: customDesignRequests.id, // Use id instead of designId
             customer_name: users.name,
             customer_email: users.email,
             status: customDesignRequests.status,
@@ -1031,17 +1059,17 @@ export class DatabaseStorage implements IStorage {
           .where(whereClause)
           .orderBy(desc(customDesignRequests.createdAt));
           
-        const pendingRequests = statusCounts.find(s => s.status === 'pending')?.count || 0;
-        const approvedRequests = statusCounts.find(s => s.status === 'approved')?.count || 0;
-        const rejectedRequests = statusCounts.find(s => s.status === 'rejected')?.count || 0;
-        const totalRequests = statusCounts.reduce((sum, item) => sum + Number(item.count), 0);
+        const pendingRequests = statusCounts.find((s: any) => s.status === 'pending')?.count || 0;
+        const approvedRequests = statusCounts.find((s: any) => s.status === 'approved')?.count || 0;
+        const rejectedRequests = statusCounts.find((s: any) => s.status === 'rejected')?.count || 0;
+        const totalRequests = statusCounts.reduce((sum: number, item: any) => sum + Number(item.count), 0);
         
         return {
           totalRequests,
           pendingRequests,
           approvedRequests,
           rejectedRequests,
-          customDesignsData: customDesignsData.map(item => ({
+          customDesignsData: customDesignsData.map((item: any) => ({
             ...item,
             id: Number(item.id),
             description: 'No description available',

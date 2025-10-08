@@ -25,6 +25,11 @@ const loginSchema = z.object({
 
 router.post("/register", async (req, res) => {
   try {
+    console.log('[Auth] Registration attempt with data:', {
+      ...req.body,
+      password: req.body.password ? '[REDACTED]' : undefined
+    });
+    
     const { name, email, password, phone, address } = registerSchema.parse(req.body);
 
     const existingUser = await db.query.users.findFirst({
@@ -80,7 +85,16 @@ const { token: accessToken, token: refreshToken } = await generateTokens(user);
       accessToken,
     });
   } catch (error) {
-    console.error(error);
+    console.error('[Auth] Registration error:', error);
+    
+    if (error instanceof z.ZodError) {
+      console.error('[Auth] Validation errors:', error.errors);
+      return res.status(400).json({ 
+        message: "Validation failed", 
+        errors: error.errors.map(e => ({ field: e.path.join('.'), message: e.message }))
+      });
+    }
+    
     res.status(400).json({ message: "Invalid input" });
   }
 });
@@ -125,7 +139,16 @@ router.post("/login", async (req, res) => {
       user: { id: user.id, email: user.email, role: user.role },
     });
   } catch (error) {
-    console.error(error);
+    console.error('[Auth] Login error:', error);
+    
+    if (error instanceof z.ZodError) {
+      console.error('[Auth] Login validation errors:', error.errors);
+      return res.status(400).json({ 
+        message: "Validation failed", 
+        errors: error.errors.map(e => ({ field: e.path.join('.'), message: e.message }))
+      });
+    }
+    
     res.status(400).json({ message: "Invalid input" });
   }
 });

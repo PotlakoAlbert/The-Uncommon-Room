@@ -64,9 +64,10 @@ export default function Register() {
     onSuccess: (data) => {
       console.log('[Register] Processing successful registration:', data);
       
-      // Store token and user data
-      if (data.token) {
-        localStorage.setItem('token', data.token);
+      // Store token and user data - handle both token and accessToken
+      const token = data.token || data.accessToken;
+      if (token) {
+        localStorage.setItem('token', token);
       }
       
       if (data.user || data.customer) {
@@ -75,7 +76,7 @@ export default function Register() {
         
         dispatch(loginSuccess({
           user: { ...userData, type: 'customer' },
-          token: data.token,
+          token,
         }));
       }
       

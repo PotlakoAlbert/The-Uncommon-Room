@@ -72,7 +72,17 @@ export async function apiRequest(
   console.log('[apiRequest] Full URL:', fullUrl);
   console.log('[apiRequest] Method:', method);
   console.log('[apiRequest] Headers:', headers);
-  console.log('[apiRequest] Data:', data ? JSON.stringify(data).substring(0, 100) + '...' : 'none');
+  
+  if (data) {
+    console.log('[apiRequest] Request data:', {
+      type: typeof data,
+      isFormData: isFormData,
+      keys: data && typeof data === 'object' ? Object.keys(data) : 'not an object',
+      preview: JSON.stringify(data).substring(0, 200) + (JSON.stringify(data).length > 200 ? '...' : ''),
+    });
+  } else {
+    console.log('[apiRequest] No request data');
+  }
 
   try {
     const res = await fetch(fullUrl, {

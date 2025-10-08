@@ -83,9 +83,16 @@ async function build() {
         js: `
           // ESM module compatibility
           import { createRequire } from 'module';
+          import { fileURLToPath as __fileURLToPath } from 'url';
+          import * as __path from 'path';
           
           const require = createRequire(import.meta.url);
+          const __filename = __fileURLToPath(import.meta.url);
+          const __dirname = __path.dirname(__filename);
+          
           globalThis.require = require;
+          globalThis.__filename = __filename;
+          globalThis.__dirname = __dirname;
         `
       },
     });

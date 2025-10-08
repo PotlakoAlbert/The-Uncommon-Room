@@ -11,19 +11,20 @@ const log = console.log;
 async function initDevDependencies(app: Express) {
   if (isDevelopment) {
     try {
-      // Only import vite dependencies in development
-      const viteModule = await import('./vite.js');
-      const { setupVite, serveStatic } = viteModule;
-      const server = await import('http').then(http => http.createServer(app));
-      await setupVite(app, server);
-      serveStatic(app);
-      return server;
+      // Dynamic import only in development, won't be bundled in production
+      const viteModule = await import('./vite.js').catch(() => null);
+      if (viteModule) {
+        const { setupVite, serveStatic } = viteModule;
+        const server = await import('http').then(http => http.createServer(app));
+        await setupVite(app, server);
+        serveStatic(app);
+        return server;
+      }
     } catch (error) {
-      console.error('Failed to initialize development dependencies:', error);
-      console.log('Continuing without vite dependencies...');
-      return await import('http').then(http => http.createServer(app));
+      console.error('Vite setup failed (continuing without):', error);
     }
   }
+  console.log('Creating basic HTTP server (production mode)');
   return await import('http').then(http => http.createServer(app));
 }
 

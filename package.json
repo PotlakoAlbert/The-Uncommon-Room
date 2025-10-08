@@ -5,7 +5,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "cross-env NODE_ENV=development tsx server/index.ts",
-    "build": "npm run build:server",
+    "build": "cd client && npm install && npm run build",
     "build:server": "node build.mjs",
     "start": "node api/index.mjs",
     "check": "tsc",

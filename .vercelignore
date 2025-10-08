@@ -1,0 +1,6 @@
+server/
+shared/
+*.md
+.env
+node_modules/
+.git/

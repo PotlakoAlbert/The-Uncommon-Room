@@ -84,7 +84,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // app.use(limiter); // Temporarily disabled for debugging
 
   // API routes
-  app.use('/api/auth', authRoutes);
+  // app.use('/api/auth', authRoutes); // Temporarily disabled - using inline auth routes
   app.use('/api/cart', cartRoutes);
   app.use('/api/admins', adminRoutes);
 
@@ -148,8 +148,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
    *       400:
    *         description: Registration failed
    */
-  // Duplicate auth routes commented out - using modular auth routes instead
-  /*
+  // Temporarily re-enable duplicate auth routes for testing
   app.post('/api/auth/register', async (req, res) => {
     try {
       const { name, email, password, phone, address } = req.body;
@@ -268,9 +267,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: 'Login failed' });
     }
   });
-  */
-  
-  // End of commented duplicate auth routes
+
+  // End of temporarily re-enabled duplicate auth routes
 
   // Admin authentication
   app.post('/api/admin/login', async (req, res) => {

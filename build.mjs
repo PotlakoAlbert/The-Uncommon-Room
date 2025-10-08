@@ -51,9 +51,19 @@ async function build() {
       external: [
         // Native Node.js modules
         'path',
+        'node:path', 
         'fs',
+        'node:fs',
         'url',
+        'node:url',
         'module',
+        'node:module',
+        // Development-only modules
+        './vite',
+        './vite.js',
+        // Vite modules that cause conflicts
+        'vite',
+        'vite/dist/*',
         // External packages that cause issues
         '@babel/preset-typescript',
         '@babel/preset-typescript/package.json',
@@ -73,16 +83,9 @@ async function build() {
         js: `
           // ESM module compatibility
           import { createRequire } from 'module';
-          import { fileURLToPath } from 'url';
-          import { dirname } from 'path';
           
           const require = createRequire(import.meta.url);
-          const __filename = fileURLToPath(import.meta.url);
-          const __dirname = dirname(__filename);
-          
           globalThis.require = require;
-          globalThis.__filename = __filename;
-          globalThis.__dirname = __dirname;
         `
       },
     });

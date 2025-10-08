@@ -1,3 +1,5 @@
-# Vercel SPA routing configuration
+# API proxy
 /api/* https://web-production-b8bea.up.railway.app/api/:splat 200
+
+# SPA fallback for all other routes
 /*     /index.html   200

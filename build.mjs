@@ -1,17 +1,17 @@
 import * as esbuild from 'esbuild';
 import { writeFile, mkdir } from 'fs/promises';
-import { dirname } from 'path';
+import { dirname as pathDirname } from 'path';
 import { config } from 'dotenv';
 import { fileURLToPath } from 'url';
 import { resolve } from 'path';
 
 // Load environment variables
-const __dirname = dirname(fileURLToPath(import.meta.url));
+const __dirname = pathDirname(fileURLToPath(import.meta.url));
 config({ path: resolve(__dirname, '.env') });
 
 async function ensureDirectory(filepath) {
   try {
-    await mkdir(dirname(filepath), { recursive: true });
+    await mkdir(pathDirname(filepath), { recursive: true });
   } catch (error) {
     if (error.code !== 'EEXIST') {
       throw error;

@@ -1,7 +1,7 @@
 import express, { type Request, Response, NextFunction, type Express } from "express";
 import { registerRoutes } from "./routes";
 import { config } from 'dotenv';
-import { dirname, resolve } from 'path';
+import { dirname as pathDirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 
 const isDevelopment = process.env.NODE_ENV === 'development';
@@ -26,7 +26,7 @@ async function initDevDependencies(app: Express) {
 
 // Set up dirname for ESM
 const _filename = fileURLToPath(import.meta.url);
-const _dirname = dirname(_filename);
+const _dirname = pathDirname(_filename);
 
 // Load environment variables in development
 if (isDevelopment) {

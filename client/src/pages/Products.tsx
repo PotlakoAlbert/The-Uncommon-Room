@@ -10,10 +10,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { testNetworkConnectivity, testBackendHealth } from "../lib/networkDebug";
 import { vercelNetworkDiagnostic } from "../lib/vercelNetworkTest";
 import { apiRequest } from "@/lib/queryClient";
-import { testNetworkConnectivity, testBackendHealth } from "@/lib/networkDebug";
 
 export default function Products() {
-  const [, setLocation] = useLocation();
+  const [,] = useLocation();
   const [filters, setFilters] = useState({
     category: "",
     minPrice: "",

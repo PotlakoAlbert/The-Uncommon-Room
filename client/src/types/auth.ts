@@ -23,8 +23,10 @@ export interface LoginCredentials {
 }
 
 export interface AuthResponse {
-  accessToken: string | null;
-  user: User;
   token: string;
+  user: User;
+  customer?: User; // Backend sometimes sends customer field
   message: string;
+  // Legacy field for backward compatibility
+  accessToken?: string;
 }

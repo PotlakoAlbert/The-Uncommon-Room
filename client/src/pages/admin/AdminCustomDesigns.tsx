@@ -109,6 +109,7 @@ export default function AdminCustomDesigns() {
   };
 
   const openUpdateDialog = (design: any) => {
+    if (!design.custom_design_requests) return;
     setSelectedDesign(design);
     form.setValue('status', design.custom_design_requests.status);
     form.setValue('quoteAmount', design.custom_design_requests.quoteAmount || '');
@@ -116,7 +117,7 @@ export default function AdminCustomDesigns() {
   };
 
   const onSubmit = (data: UpdateDesignFormData) => {
-    if (!selectedDesign) return;
+    if (!selectedDesign || !selectedDesign.custom_design_requests) return;
     const designId = selectedDesign.custom_design_requests.id || selectedDesign.custom_design_requests.designId;
     if (!designId) {
       toast({
@@ -197,7 +198,7 @@ export default function AdminCustomDesigns() {
                   <div className="ml-4">
                     <p className="text-sm text-muted-foreground">Pending Review</p>
                     <p className="text-2xl font-bold text-blue-600" data-testid="text-pending-designs">
-                      {customDesigns.filter((item: any) => ['submitted', 'under_review'].includes(item.custom_design_requests.status)).length}
+                      {customDesigns.filter((item: any) => item.custom_design_requests && ['submitted', 'under_review'].includes(item.custom_design_requests.status)).length}
                     </p>
                   </div>
                 </div>
@@ -213,7 +214,7 @@ export default function AdminCustomDesigns() {
                   <div className="ml-4">
                     <p className="text-sm text-muted-foreground">Approved</p>
                     <p className="text-2xl font-bold text-green-600" data-testid="text-approved-designs">
-                      {customDesigns.filter((item: any) => item.custom_design_requests.status === 'approved').length}
+                      {customDesigns.filter((item: any) => item.custom_design_requests && item.custom_design_requests.status === 'approved').length}
                     </p>
                   </div>
                 </div>
@@ -229,7 +230,7 @@ export default function AdminCustomDesigns() {
                   <div className="ml-4">
                     <p className="text-sm text-muted-foreground">Quoted</p>
                     <p className="text-2xl font-bold text-purple-600" data-testid="text-quoted-designs">
-                      {customDesigns.filter((item: any) => item.custom_design_requests.status === 'quoted').length}
+                      {customDesigns.filter((item: any) => item.custom_design_requests && item.custom_design_requests.status === 'quoted').length}
                     </p>
                   </div>
                 </div>
@@ -274,7 +275,7 @@ export default function AdminCustomDesigns() {
                     </tr>
                   </thead>
                   <tbody>
-                    {customDesigns.map((design: any) => {
+                    {customDesigns.filter((design: any) => design.custom_design_requests).map((design: any) => {
                       // Use id as the primary identifier, fall back to designId if id is not available
                       const designId = design.custom_design_requests.id || design.custom_design_requests.designId;
                       return (
@@ -354,7 +355,7 @@ export default function AdminCustomDesigns() {
               </DialogTitle>
             </DialogHeader>
             
-            {selectedDesign && (
+            {selectedDesign && selectedDesign.custom_design_requests && (
               <div className="space-y-6">
                 {/* Request Header */}
                 <div className="flex justify-between items-start">

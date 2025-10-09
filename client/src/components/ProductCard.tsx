@@ -1,5 +1,6 @@
 import { Link } from "wouter";
-import { useDispatch, useSelector } from "react-redux";
+import { useSelector } from "react-redux";
+import { useAppDispatch } from "@/store/hooks";
 import { addToLocalCart, addToServerCart } from "@/store/cartSlice";
 import { RootState } from "@/store/store";
 import { Button } from "@/components/ui/button";
@@ -20,7 +21,7 @@ interface ProductCardProps {
 }
 
 export default function ProductCard({ product }: ProductCardProps) {
-  const dispatch = useDispatch();
+  const dispatch = useAppDispatch();
   const { toast } = useToast();
   const { isAuthenticated, user } = useSelector((state: RootState) => state.auth);
 
@@ -31,7 +32,7 @@ export default function ProductCard({ product }: ProductCardProps) {
     try {
       if (isAuthenticated) {
         // User is logged in - sync with server
-        void dispatch(addToServerCart({
+        dispatch(addToServerCart({
           productId: product.prodId,
           quantity: 1,
         }));

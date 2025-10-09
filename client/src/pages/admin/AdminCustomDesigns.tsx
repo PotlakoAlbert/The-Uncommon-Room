@@ -8,7 +8,6 @@ import { z } from "zod";
 import { RootState } from "@/store/store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -110,13 +109,15 @@ export default function AdminCustomDesigns() {
 
   const openUpdateDialog = (design: any) => {
     setSelectedDesign(design);
-    form.setValue('status', design.custom_design_requests.status);
-    form.setValue('quoteAmount', design.custom_design_requests.quoteAmount || '');
+    if (design.custom_design_requests) {
+      form.setValue('status', design.custom_design_requests.status);
+      form.setValue('quoteAmount', design.custom_design_requests.quoteAmount || '');
+    }
     setIsUpdateDialogOpen(true);
   };
 
   const onSubmit = (data: UpdateDesignFormData) => {
-    if (!selectedDesign) return;
+    if (!selectedDesign || !selectedDesign.custom_design_requests) return;
     const designId = selectedDesign.custom_design_requests.id || selectedDesign.custom_design_requests.designId;
     if (!designId) {
       toast({
@@ -197,7 +198,7 @@ export default function AdminCustomDesigns() {
                   <div className="ml-4">
                     <p className="text-sm text-muted-foreground">Pending Review</p>
                     <p className="text-2xl font-bold text-blue-600" data-testid="text-pending-designs">
-                      {customDesigns.filter((item: any) => ['submitted', 'under_review'].includes(item.custom_design_requests.status)).length}
+                      {customDesigns.filter((item: any) => item.custom_design_requests && ['submitted', 'under_review'].includes(item.custom_design_requests.status)).length}
                     </p>
                   </div>
                 </div>
@@ -213,7 +214,7 @@ export default function AdminCustomDesigns() {
                   <div className="ml-4">
                     <p className="text-sm text-muted-foreground">Approved</p>
                     <p className="text-2xl font-bold text-green-600" data-testid="text-approved-designs">
-                      {customDesigns.filter((item: any) => item.custom_design_requests.status === 'approved').length}
+                      {customDesigns.filter((item: any) => item.custom_design_requests && item.custom_design_requests.status === 'approved').length}
                     </p>
                   </div>
                 </div>
@@ -229,7 +230,7 @@ export default function AdminCustomDesigns() {
                   <div className="ml-4">
                     <p className="text-sm text-muted-foreground">Quoted</p>
                     <p className="text-2xl font-bold text-purple-600" data-testid="text-quoted-designs">
-                      {customDesigns.filter((item: any) => item.custom_design_requests.status === 'quoted').length}
+                      {customDesigns.filter((item: any) => item.custom_design_requests && item.custom_design_requests.status === 'quoted').length}
                     </p>
                   </div>
                 </div>
@@ -274,7 +275,7 @@ export default function AdminCustomDesigns() {
                     </tr>
                   </thead>
                   <tbody>
-                    {customDesigns.map((design: any) => {
+                    {customDesigns.filter((design: any) => design.custom_design_requests).map((design: any) => {
                       // Use id as the primary identifier, fall back to designId if id is not available
                       const designId = design.custom_design_requests.id || design.custom_design_requests.designId;
                       return (
@@ -354,7 +355,7 @@ export default function AdminCustomDesigns() {
               </DialogTitle>
             </DialogHeader>
             
-            {selectedDesign && (
+            {selectedDesign && selectedDesign.custom_design_requests && (
               <div className="space-y-6">
                 {/* Request Header */}
                 <div className="flex justify-between items-start">
@@ -473,7 +474,8 @@ export default function AdminCustomDesigns() {
                       setIsDetailsDialogOpen(false);
                       openUpdateDialog(selectedDesign);
                     }}
-                    data-testid={`button-update-from-details-${selectedDesign.custom_design_requests.designId}`}
+                    disabled={!selectedDesign?.custom_design_requests}
+                    data-testid={`button-update-from-details-${selectedDesign?.custom_design_requests?.designId || 'unknown'}`}
                   >
                     <span className="material-icons mr-2">edit</span>
                     Update Status
@@ -483,16 +485,22 @@ export default function AdminCustomDesigns() {
                     variant="outline"
                     onClick={() => {
                       const email = selectedDesign.users?.email || selectedDesign.customers?.email;
-                      if (email) {
+                      if (email && selectedDesign?.custom_design_requests?.designId) {
                         window.location.href = `mailto:${email}?subject=Re: Custom Design Request #${selectedDesign.custom_design_requests.designId}`;
                       }
                     }}
-                    data-testid={`button-email-customer-${selectedDesign.custom_design_requests.designId}`}
+                    disabled={!selectedDesign?.custom_design_requests}
+                    data-testid={`button-email-customer-${selectedDesign?.custom_design_requests?.designId || 'unknown'}`}
                   >
                     <span className="material-icons mr-2">email</span>
                     Email Customer
                   </Button>
                 </div>
+              </div>
+            )}
+            {selectedDesign && !selectedDesign.custom_design_requests && (
+              <div className="text-center py-4">
+                <p className="text-red-600">Error: Design request data is missing or corrupted.</p>
               </div>
             )}
           </DialogContent>
@@ -507,7 +515,7 @@ export default function AdminCustomDesigns() {
               </DialogTitle>
             </DialogHeader>
             
-            {selectedDesign && (
+            {selectedDesign && selectedDesign.custom_design_requests && (
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                   <div className="mb-4">
@@ -592,6 +600,11 @@ export default function AdminCustomDesigns() {
                   </div>
                 </form>
               </Form>
+            )}
+            {selectedDesign && !selectedDesign.custom_design_requests && (
+              <div className="text-center py-4">
+                <p className="text-red-600">Error: Design request data is missing or corrupted.</p>
+              </div>
             )}
           </DialogContent>
         </Dialog>

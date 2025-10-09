@@ -4,7 +4,7 @@ require('dotenv').config();
 // Import the server app
 const server = require('./server');
 
-// Get port from environment variable or fallback to 8080 (Azure's default)
+// Get port from environment variable or fallback to 8080
 const PORT = process.env.PORT || 8080;
 
 // Start the server

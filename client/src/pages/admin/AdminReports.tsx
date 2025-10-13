@@ -12,6 +12,31 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { Bar, Line, Pie, Doughnut } from "react-chartjs-2";
+import {
+  Chart,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  LineElement,
+  PointElement,
+  ArcElement,
+} from "chart.js";
+
+Chart.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  LineElement,
+  PointElement,
+  ArcElement
+);
 
 interface ReportData {
   totalSales: number;
@@ -66,7 +91,7 @@ export default function AdminReports() {
 
   const { data: reportData, isLoading, refetch, error } = useQuery({
     queryKey: ['/api/admin/reports', selectedReportType, selectedDateRange, customStartDate, customEndDate],
-    enabled: false, // Don't auto-fetch, wait for manual trigger
+    enabled: false,
     queryFn: async () => {
       try {
         const params = new URLSearchParams({
@@ -91,11 +116,9 @@ export default function AdminReports() {
         const data = await response.json();
         console.log('Report data received:', data);
         
-        // Normalize and sanitize data
         const normalizeData = (data: any) => {
           if (!data) return data;
           
-          // Convert any string numbers to actual numbers
           const parseNumericField = (value: any) => {
             if (value === null || value === undefined) return 0;
             if (typeof value === 'number') return value;
@@ -106,17 +129,14 @@ export default function AdminReports() {
             return 0;
           };
           
-          // Ensure specific report types have expected structure
           if (selectedReportType === 'inventory') {
             console.log('Normalizing inventory data...');
             
-            // Convert string numbers to actual numbers at top level
             data.totalProducts = parseNumericField(data.totalProducts);
             data.totalValue = parseNumericField(data.totalValue);
             data.lowStockItems = parseNumericField(data.lowStockItems);
             data.outOfStockItems = parseNumericField(data.outOfStockItems);
             
-            // Ensure inventoryData is an array
             if (!data.inventoryData || !Array.isArray(data.inventoryData)) {
               console.warn('inventoryData is not an array, initializing empty array');
               data.inventoryData = [];
@@ -124,9 +144,7 @@ export default function AdminReports() {
               console.log(`Normalizing ${data.inventoryData.length} inventory items`);
             }
             
-            // Normalize each inventory item to ensure safe rendering
             data.inventoryData = data.inventoryData.map((item: any) => {
-              // Print item details for debugging
               console.log('Original inventory item:', JSON.stringify(item));
               
               return {
@@ -144,13 +162,11 @@ export default function AdminReports() {
           if (selectedReportType === 'customDesigns') {
             console.log('Normalizing custom designs data...');
             
-            // Convert string numbers to actual numbers at top level
             data.totalRequests = parseNumericField(data.totalRequests);
             data.pendingRequests = parseNumericField(data.pendingRequests);
             data.approvedRequests = parseNumericField(data.approvedRequests);
             data.rejectedRequests = parseNumericField(data.rejectedRequests);
             
-            // Ensure customDesignsData is an array
             if (!data.customDesignsData || !Array.isArray(data.customDesignsData)) {
               console.warn('customDesignsData is not an array, initializing empty array');
               data.customDesignsData = [];
@@ -158,7 +174,6 @@ export default function AdminReports() {
               console.log(`Normalizing ${data.customDesignsData.length} custom design requests`);
             }
             
-            // Helper to ensure a value is an array
             const ensureArray = (val: any): any[] => {
               if (Array.isArray(val)) return val;
               if (val === null || val === undefined) return [];
@@ -173,9 +188,7 @@ export default function AdminReports() {
               return [val];
             };
             
-            // Normalize custom design data
             data.customDesignsData = data.customDesignsData.map((item: any) => {
-              // Print item details for debugging
               console.log('Original custom design item:', JSON.stringify(item));
               
               return {
@@ -191,21 +204,17 @@ export default function AdminReports() {
               };
             });
             
-            // If old format exists, still normalize it for backward compatibility
             if (data.statusBreakdown || data.recentRequests) {
               console.log('Also found old format custom designs data, normalizing...');
               
-              // Ensure arrays exist
               data.statusBreakdown = Array.isArray(data.statusBreakdown) ? data.statusBreakdown : [];
               data.recentRequests = Array.isArray(data.recentRequests) ? data.recentRequests : [];
               
-              // Normalize each status breakdown item
               data.statusBreakdown = data.statusBreakdown.map((item: any) => ({
                 status: item.status || 'unknown',
                 count: parseNumericField(item.count)
               }));
               
-              // Normalize each request
               data.recentRequests = data.recentRequests.map((item: any) => ({
                 designId: parseNumericField(item.designId),
                 customerName: item.customerName || 'Unknown',
@@ -220,17 +229,14 @@ export default function AdminReports() {
           if (selectedReportType === 'custom_designs') {
             console.log('Normalizing legacy custom_designs data...');
             
-            // Ensure arrays exist
             data.statusBreakdown = Array.isArray(data.statusBreakdown) ? data.statusBreakdown : [];
             data.recentRequests = Array.isArray(data.recentRequests) ? data.recentRequests : [];
             
-            // Normalize each status breakdown item
             data.statusBreakdown = data.statusBreakdown.map((item: any) => ({
               status: item.status || 'unknown',
               count: parseNumericField(item.count)
             }));
             
-            // Normalize each request
             data.recentRequests = data.recentRequests.map((item: any) => ({
               designId: parseNumericField(item.designId),
               customerName: item.customerName || 'Unknown',
@@ -254,17 +260,14 @@ export default function AdminReports() {
     retryDelay: 1000,
   });
 
-  // Debug: Log reportData changes with detailed analysis
   useEffect(() => {
     console.log('Report data changed:', reportData);
     console.log('Is loading:', isLoading);
     console.log('Error:', error);
     
-    // Add enhanced debugging for report data
     if (reportData) {
       console.log('Report type:', selectedReportType);
       
-      // Debug inventory data
       if (selectedReportType === 'inventory') {
         console.log('Inventory data analysis:');
         console.log('- totalProducts:', typeof reportData.totalProducts, reportData.totalProducts);
@@ -282,7 +285,6 @@ export default function AdminReports() {
         }
       }
       
-      // Debug custom designs data
       if (selectedReportType === 'customDesigns') {
         console.log('Custom designs data analysis:');
         console.log('- totalRequests:', typeof reportData.totalRequests, reportData.totalRequests);
@@ -312,22 +314,17 @@ export default function AdminReports() {
         throw result.error;
       }
       
-      // Sanitize data to prevent objects being rendered directly
       if (result.data) {
-        // Process the data to ensure all values are renderable
         const sanitizeData = (obj: any) => {
           if (!obj) return obj;
           
           Object.keys(obj).forEach(key => {
             const value = obj[key];
             
-            // Check if the value is an object but not an array and not null
             if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
-              // If it's a Date object, keep it
               if (value instanceof Date) {
                 obj[key] = value;
               } else {
-                // For other objects that might be incorrectly rendered, convert to string
                 try {
                   obj[key] = JSON.stringify(value);
                 } catch (e) {
@@ -338,7 +335,6 @@ export default function AdminReports() {
           });
         };
         
-        // Apply sanitization to top-level properties
         sanitizeData(result.data);
       }
       
@@ -393,10 +389,8 @@ export default function AdminReports() {
         throw new Error(`Failed to export report: ${response.status} ${errorText}`);
       }
       
-      // Create download link
       const blob = await response.blob();
       if (blob.size < 100) {
-        // If the file is too small, it might be an error
         const text = await blob.text();
         console.warn('Export returned a very small file, checking content:', text);
         if (text.includes('error') || text.includes('fail')) {
@@ -606,7 +600,7 @@ export default function AdminReports() {
               </CardContent>
             </Card>
           </div>
-  ) : reportData ? (
+        ) : reportData ? (
           <div className="space-y-6">
             {/* Summary Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -675,7 +669,537 @@ export default function AdminReports() {
               </Card>
             </div>
 
-            {/* Top Selling Products (Sales report) */}
+            {/* --- SALES REPORT VISUALS --- */}
+            {selectedReportType === "sales" && (
+              <>
+                {/* Sales Trend Analysis */}
+                {reportData.salesByMonth && reportData.salesByMonth.length > 0 && (
+                  <Card className="material-shadow">
+                    <CardHeader>
+                      <CardTitle>Sales Trend Analysis</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div>
+                          <h4 className="font-medium mb-4">Monthly Revenue Trend</h4>
+                          <Line
+                            data={{
+                              labels: reportData.salesByMonth.map((m: any) => m.month),
+                              datasets: [
+                                {
+                                  label: 'Revenue (R)',
+                                  data: reportData.salesByMonth.map((m: any) => m.sales),
+                                  borderColor: 'rgb(34, 197, 94)',
+                                  backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                                  tension: 0.3,
+                                  fill: true,
+                                },
+                              ],
+                            }}
+                            options={{
+                              responsive: true,
+                              plugins: {
+                                legend: { position: 'top' },
+                              },
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <h4 className="font-medium mb-4">Order Volume Trend</h4>
+                          <Line
+                            data={{
+                              labels: reportData.salesByMonth.map((m: any) => m.month),
+                              datasets: [
+                                {
+                                  label: 'Orders',
+                                  data: reportData.salesByMonth.map((m: any) => m.orders),
+                                  borderColor: 'rgb(59, 130, 246)',
+                                  backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                                  tension: 0.3,
+                                  fill: true,
+                                },
+                              ],
+                            }}
+                            options={{
+                              responsive: true,
+                              plugins: {
+                                legend: { position: 'top' },
+                              },
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Top Selling Products */}
+                {reportData.topSellingProducts && reportData.topSellingProducts.length > 0 && (
+                  <Card className="material-shadow">
+                    <CardHeader>
+                      <CardTitle>Top Selling Products Analysis</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                        <div>
+                          <h4 className="font-medium mb-4">Units Sold Distribution</h4>
+                          <Pie
+                            data={{
+                              labels: reportData.topSellingProducts.map((p: any) => p.name),
+                              datasets: [
+                                {
+                                  label: 'Units Sold',
+                                  data: reportData.topSellingProducts.map((p: any) => p.quantitySold),
+                                  backgroundColor: [
+                                    'rgba(34,197,94,0.6)',
+                                    'rgba(59,130,246,0.6)',
+                                    'rgba(139,92,246,0.6)',
+                                    'rgba(251,191,36,0.6)',
+                                    'rgba(239,68,68,0.6)',
+                                  ],
+                                },
+                              ],
+                            }}
+                            options={{
+                              plugins: {
+                                legend: { position: 'bottom' },
+                              },
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <h4 className="font-medium mb-4">Revenue Comparison</h4>
+                          <Bar
+                            data={{
+                              labels: reportData.topSellingProducts.map((p: any) => p.name),
+                              datasets: [
+                                {
+                                  label: 'Revenue (R)',
+                                  data: reportData.topSellingProducts.map((p: any) => p.revenue),
+                                  backgroundColor: 'rgba(34, 197, 94, 0.6)',
+                                },
+                              ],
+                            }}
+                            options={{
+                              responsive: true,
+                              plugins: {
+                                legend: { position: 'top' },
+                              },
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Sales by Month */}
+                {reportData.salesByMonth && reportData.salesByMonth.length > 0 && (
+                  <Card className="material-shadow">
+                    <CardHeader>
+                      <CardTitle>Monthly Sales Performance</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="mb-6">
+                        <Bar
+                          data={{
+                            labels: reportData.salesByMonth.map((m: any) => m.month),
+                            datasets: [
+                              {
+                                label: 'Sales (R)',
+                                data: reportData.salesByMonth.map((m: any) => m.sales),
+                                backgroundColor: 'rgba(34,197,94,0.6)',
+                              },
+                              {
+                                label: 'Orders',
+                                data: reportData.salesByMonth.map((m: any) => m.orders),
+                                backgroundColor: 'rgba(59,130,246,0.4)',
+                              },
+                            ],
+                          }}
+                          options={{
+                            responsive: true,
+                            plugins: {
+                              legend: { position: 'top' },
+                            },
+                          }}
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </>
+            )}
+
+            {/* --- INVENTORY REPORT VISUALS --- */}
+            {selectedReportType === "inventory" && (
+              <>
+                <Card className="material-shadow">
+                  <CardHeader>
+                    <CardTitle>Inventory Overview</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                      <div>
+                        <h4 className="font-medium mb-4">Stock Status Distribution</h4>
+                        <Doughnut
+                          data={{
+                            labels: ['Adequate Stock', 'Low Stock', 'Out of Stock'],
+                            datasets: [
+                              {
+                                data: [
+                                  (reportData.totalProducts || 0) - (reportData.lowStockItems || 0) - (reportData.outOfStockItems || 0),
+                                  reportData.lowStockItems || 0,
+                                  reportData.outOfStockItems || 0,
+                                ],
+                                backgroundColor: [
+                                  'rgba(34, 197, 94, 0.6)',
+                                  'rgba(251, 191, 36, 0.6)',
+                                  'rgba(239, 68, 68, 0.6)',
+                                ],
+                              },
+                            ],
+                          }}
+                          options={{
+                            plugins: {
+                              legend: { position: 'bottom' },
+                            },
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <h4 className="font-medium mb-4">Price Range Distribution</h4>
+                        <Bar
+                          data={{
+                            labels: ['Under R100', 'R100-500', 'R500-1000', 'R1000+'],
+                            datasets: [
+                              {
+                                label: 'Number of Products',
+                                data: (() => {
+                                  const ranges = [0, 0, 0, 0];
+                                  reportData.inventoryData?.forEach((item: any) => {
+                                    const price = parseFloat(item.price) || 0;
+                                    if (price < 100) ranges[0]++;
+                                    else if (price < 500) ranges[1]++;
+                                    else if (price < 1000) ranges[2]++;
+                                    else ranges[3]++;
+                                  });
+                                  return ranges;
+                                })(),
+                                backgroundColor: 'rgba(139, 92, 246, 0.6)',
+                              },
+                            ],
+                          }}
+                          options={{
+                            responsive: true,
+                            plugins: {
+                              legend: { position: 'top' },
+                            },
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Category Distribution */}
+                    {reportData.inventoryData?.some((item: any) => item.category) && (
+                      <div>
+                        <h4 className="font-medium mb-4">Inventory by Category</h4>
+                        <Bar
+                          data={{
+                            labels: (() => {
+                              const categories = [...new Set(reportData.inventoryData.map((item: any) => item.category || 'Uncategorized'))];
+                              return categories;
+                            })(),
+                            datasets: [
+                              {
+                                label: 'Products per Category',
+                                data: (() => {
+                                  const categoryCount: { [key: string]: number } = {};
+                                  reportData.inventoryData.forEach((item: any) => {
+                                    const category = item.category || 'Uncategorized';
+                                    categoryCount[category] = (categoryCount[category] || 0) + 1;
+                                  });
+                                  return Object.values(categoryCount);
+                                })(),
+                                backgroundColor: 'rgba(59, 130, 246, 0.6)',
+                              },
+                            ],
+                          }}
+                          options={{
+                            responsive: true,
+                            plugins: {
+                              legend: { position: 'top' },
+                            },
+                          }}
+                        />
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </>
+            )}
+
+            {/* --- CUSTOMER REPORT VISUALS --- */}
+            {selectedReportType === "customers" && reportData.topCustomers && (
+              <Card className="material-shadow">
+                <CardHeader>
+                  <CardTitle>Customer Analytics</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div>
+                      <h4 className="font-medium mb-4">Top Customers by Spending</h4>
+                      <Bar
+                        data={{
+                          labels: reportData.topCustomers.slice(0, 8).map((c: any) => c.name),
+                          datasets: [
+                            {
+                              label: 'Total Spent (R)',
+                              data: reportData.topCustomers.slice(0, 8).map((c: any) => parseFloat(c.totalSpent)),
+                              backgroundColor: 'rgba(168, 85, 247, 0.6)',
+                            },
+                          ],
+                        }}
+                        options={{
+                          responsive: true,
+                          plugins: {
+                            legend: { position: 'top' },
+                          },
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <h4 className="font-medium mb-4">Customer Order Distribution</h4>
+                      <Doughnut
+                        data={{
+                          labels: ['1 Order', '2-5 Orders', '6+ Orders'],
+                          datasets: [
+                            {
+                              data: (() => {
+                                const ranges = [0, 0, 0];
+                                reportData.topCustomers.forEach((c: any) => {
+                                  const orders = parseInt(c.totalOrders) || 0;
+                                  if (orders === 1) ranges[0]++;
+                                  else if (orders <= 5) ranges[1]++;
+                                  else ranges[2]++;
+                                });
+                                return ranges;
+                              })(),
+                              backgroundColor: [
+                                'rgba(59, 130, 246, 0.6)',
+                                'rgba(139, 92, 246, 0.6)',
+                                'rgba(236, 72, 153, 0.6)',
+                              ],
+                            },
+                          ],
+                        }}
+                        options={{
+                          plugins: {
+                            legend: { position: 'bottom' },
+                          },
+                        }}
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* --- PRODUCT REPORT VISUALS --- */}
+            {selectedReportType === "products" && reportData.productPerformance && (
+              <Card className="material-shadow">
+                <CardHeader>
+                  <CardTitle>Product Performance Analytics</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div>
+                      <h4 className="font-medium mb-4">Revenue vs Units Sold</h4>
+                      <Bar
+                        data={{
+                          labels: reportData.productPerformance.slice(0, 6).map((p: any) => p.name),
+                          datasets: [
+                            {
+                              label: "Revenue (R)",
+                              data: reportData.productPerformance.slice(0, 6).map((p: any) => parseFloat(p.totalRevenue)),
+                              backgroundColor: "rgba(34, 197, 94, 0.6)",
+                              yAxisID: "y",
+                            },
+                            {
+                              label: "Units Sold",
+                              data: reportData.productPerformance.slice(0, 6).map((p: any) => parseInt(p.totalSold)),
+                              backgroundColor: "rgba(59, 130, 246, 0.6)",
+                              yAxisID: "y1",
+                            },
+                          ],
+                        }}
+                        options={{
+                          responsive: true,
+                          interaction: { mode: "index", intersect: false },
+                          plugins: {
+                            legend: { position: "top" },
+                          },
+                          scales: {
+                            y: {
+                              type: "linear",
+                              display: true,
+                              position: "left",
+                              title: { display: true, text: "Revenue (R)" },
+                            },
+                            y1: {
+                              type: "linear",
+                              display: true,
+                              position: "right",
+                              title: { display: true, text: "Units Sold" },
+                              grid: { drawOnChartArea: false },
+                            },
+                          },
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <h4 className="font-medium mb-4">Top Products by Order Count</h4>
+                      <Bar
+                        data={{
+                          labels: reportData.productPerformance.slice(0, 8).map((p: any) =>
+                            p.name.length > 15 ? p.name.substring(0, 15) + "..." : p.name
+                          ),
+                          datasets: [
+                            {
+                              label: "Order Count",
+                              data: reportData.productPerformance.slice(0, 8).map((p: any) => parseInt(p.orderCount)),
+                              backgroundColor: "rgba(251, 191, 36, 0.6)",
+                            },
+                          ],
+                        }}
+                        options={{
+                          responsive: true,
+                          plugins: {
+                            legend: { position: "top" },
+                          },
+                        }}
+                      />
+                    </div>
+                  </div>
+                  
+                  {/* Category Performance */}
+                  {reportData.productPerformance.some((p: any) => p.category) && (
+                    <div className="mt-6">
+                      <h4 className="font-medium mb-4">Performance by Category</h4>
+                      <Bar
+                        data={{
+                          labels: (() => {
+                            const categories = [
+                              ...new Set(reportData.productPerformance.map((p: any) => p.category || "Uncategorized")),
+                            ];
+                            return categories;
+                          })(),
+                          datasets: [
+                            {
+                              label: "Total Revenue (R)",
+                              data: (() => {
+                                const categoryRevenue: { [key: string]: number } = {};
+                                reportData.productPerformance.forEach((p: any) => {
+                                  const category = p.category || "Uncategorized";
+                                  categoryRevenue[category] = (categoryRevenue[category] || 0) + parseFloat(p.totalRevenue);
+                                });
+                                return Object.values(categoryRevenue);
+                              })(),
+                              backgroundColor: "rgba(139, 92, 246, 0.6)",
+                            },
+                          ],
+                        }}
+                        options={{
+                          responsive: true,
+                          plugins: {
+                            legend: { position: "top" },
+                          },
+                        }}
+                      />
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* --- CUSTOM DESIGNS REPORT VISUALS --- */}
+            {selectedReportType === "customDesigns" && reportData.customDesignsData && (
+              <Card className="material-shadow">
+                <CardHeader>
+                  <CardTitle>Custom Designs Analytics</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div>
+                      <h4 className="font-medium mb-4">Request Status Distribution</h4>
+                      <Doughnut
+                        data={{
+                          labels: ['Pending', 'Approved', 'Rejected', 'Other'],
+                          datasets: [
+                            {
+                              data: [
+                                reportData.pendingRequests || 0,
+                                reportData.approvedRequests || 0,
+                                reportData.rejectedRequests || 0,
+                                (reportData.totalRequests || 0) - 
+                                  (reportData.pendingRequests || 0) - 
+                                  (reportData.approvedRequests || 0) - 
+                                  (reportData.rejectedRequests || 0)
+                              ],
+                              backgroundColor: [
+                                'rgba(251, 191, 36, 0.6)',
+                                'rgba(34, 197, 94, 0.6)',
+                                'rgba(239, 68, 68, 0.6)',
+                                'rgba(156, 163, 175, 0.6)',
+                              ],
+                            },
+                          ],
+                        }}
+                        options={{
+                          plugins: {
+                            legend: { position: 'bottom' },
+                          },
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <h4 className="font-medium mb-4">Budget Range Distribution</h4>
+                      <Bar
+                        data={{
+                          labels: ['Under R500', 'R500-2000', 'R2000-5000', 'R5000+'],
+                          datasets: [
+                            {
+                              label: 'Number of Requests',
+                              data: (() => {
+                                const ranges = [0, 0, 0, 0];
+                                reportData.customDesignsData.forEach((item: any) => {
+                                  const budget = parseFloat(item.budget) || 0;
+                                  if (budget < 500) ranges[0]++;
+                                  else if (budget < 2000) ranges[1]++;
+                                  else if (budget < 5000) ranges[2]++;
+                                  else ranges[3]++;
+                                });
+                                return ranges;
+                              })(),
+                              backgroundColor: 'rgba(59, 130, 246, 0.6)',
+                            },
+                          ],
+                        }}
+                        options={{
+                          responsive: true,
+                          plugins: {
+                            legend: { position: 'top' },
+                          },
+                        }}
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Existing data tables and lists remain below the charts */}
+            {/* Top Selling Products List */}
             {reportData.topSellingProducts && reportData.topSellingProducts.length > 0 && (
               <Card className="material-shadow">
                 <CardHeader>
@@ -710,7 +1234,7 @@ export default function AdminReports() {
               </Card>
             )}
 
-            {/* Recent Orders (Sales report) */}
+            {/* Recent Orders Table */}
             {reportData.recentOrders && reportData.recentOrders.length > 0 && (
               <Card className="material-shadow">
                 <CardHeader>
@@ -765,239 +1289,11 @@ export default function AdminReports() {
               </Card>
             )}
 
-            {/* Sales by Month (Sales report) */}
-            {reportData.salesByMonth && reportData.salesByMonth.length > 0 && (
+            {/* Inventory Details Table */}
+            {selectedReportType === 'inventory' && reportData?.inventoryData?.length > 0 && (
               <Card className="material-shadow">
                 <CardHeader>
-                  <CardTitle data-testid="text-sales-by-month-title">Sales by Month</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {reportData.salesByMonth.map((month: any, index: number) => (
-                      <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
-                        <div>
-                          <p className="font-medium" data-testid={`text-month-${index}`}>
-                            {month.month}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            {month.orders} orders
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-bold text-green-600" data-testid={`text-month-sales-${index}`}>
-                            R {month.sales?.toLocaleString() || '0'}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Inventory Report */}
-            {selectedReportType === 'inventory' && (
-              <>
-                <Card className="material-shadow">
-                  <CardHeader>
-                    <CardTitle>Inventory Overview</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                      <div className="p-4 border rounded-lg">
-                        <p className="text-sm text-muted-foreground">Total Products</p>
-                        <p className="text-2xl font-bold">
-                          {(() => {
-                            // Ensure totalProducts is safely rendered as a number
-                            if (reportData?.totalProducts === undefined || reportData?.totalProducts === null) return '0';
-                            if (typeof reportData.totalProducts === 'number') return reportData.totalProducts.toLocaleString();
-                            try {
-                              const value = parseFloat(String(reportData.totalProducts));
-                              return !isNaN(value) ? value.toLocaleString() : '0';
-                            } catch {
-                              return '0';
-                            }
-                          })()}
-                        </p>
-                      </div>
-                      <div className="p-4 border rounded-lg">
-                        <p className="text-sm text-muted-foreground">Total Value</p>
-                        <p className="text-2xl font-bold">
-                          R {(() => {
-                            // Ensure totalValue is safely rendered as a currency number
-                            if (reportData?.totalValue === undefined || reportData?.totalValue === null) return '0';
-                            if (typeof reportData.totalValue === 'number') return reportData.totalValue.toLocaleString();
-                            try {
-                              const value = parseFloat(String(reportData.totalValue));
-                              return !isNaN(value) ? value.toLocaleString() : '0';
-                            } catch {
-                              return '0';
-                            }
-                          })()}
-                        </p>
-                      </div>
-                      <div className="p-4 border rounded-lg">
-                        <p className="text-sm text-muted-foreground">Low Stock Items</p>
-                        <p className="text-2xl font-bold text-yellow-600">
-                          {(() => {
-                            // Ensure lowStockItems is safely rendered as a number
-                            if (reportData?.lowStockItems === undefined || reportData?.lowStockItems === null) return '0';
-                            if (typeof reportData.lowStockItems === 'number') return reportData.lowStockItems.toLocaleString();
-                            try {
-                              const value = parseFloat(String(reportData.lowStockItems));
-                              return !isNaN(value) ? value.toLocaleString() : '0';
-                            } catch {
-                              return '0';
-                            }
-                          })()}
-                        </p>
-                      </div>
-                      <div className="p-4 border rounded-lg">
-                        <p className="text-sm text-muted-foreground">Out of Stock</p>
-                        <p className="text-2xl font-bold text-red-600">
-                          {(() => {
-                            // Ensure outOfStockItems is safely rendered as a number
-                            if (reportData?.outOfStockItems === undefined || reportData?.outOfStockItems === null) return '0';
-                            if (typeof reportData.outOfStockItems === 'number') return reportData.outOfStockItems.toLocaleString();
-                            try {
-                              const value = parseFloat(String(reportData.outOfStockItems));
-                              return !isNaN(value) ? value.toLocaleString() : '0';
-                            } catch {
-                              return '0';
-                            }
-                          })()}
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {reportData?.inventoryData?.length > 0 ? (
-                  <Card className="material-shadow">
-                    <CardHeader>
-                      <CardTitle>Inventory Details</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="overflow-x-auto">
-                        <table className="w-full">
-                          <thead className="bg-muted">
-                            <tr>
-                              <th className="text-left p-3">Product</th>
-                              <th className="text-left p-3">Category</th>
-                              <th className="text-left p-3">Price</th>
-                              <th className="text-left p-3">Qty</th>
-                              <th className="text-left p-3">Last Updated</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {reportData.inventoryData.map((row: any, index: number) => (
-                              <tr key={row.productId || index} className="border-b border-border">
-                                <td className="p-3">{typeof row.name === 'string' ? row.name : 'Unknown'}</td>
-                                <td className="p-3 capitalize">{typeof row.category === 'string' ? row.category : 'N/A'}</td>
-                                <td className="p-3">
-                                  R {(() => {
-                                    try {
-                                      if (!row.price) return '0';
-                                      if (typeof row.price === 'number') return row.price.toLocaleString();
-                                      if (typeof row.price === 'string') {
-                                        const parsedPrice = parseFloat(row.price);
-                                        return !isNaN(parsedPrice) ? parsedPrice.toLocaleString() : '0';
-                                      }
-                                      return '0';
-                                    } catch (e) {
-                                      console.error('Error formatting price:', e);
-                                      return '0';
-                                    }
-                                  })()}
-                                </td>
-                                <td className="p-3">
-                                  {(() => {
-                                    try {
-                                      if (typeof row.quantity === 'number') return row.quantity.toLocaleString();
-                                      if (typeof row.quantity === 'string') {
-                                        const parsed = parseInt(row.quantity);
-                                        return !isNaN(parsed) ? parsed.toLocaleString() : '0';
-                                      }
-                                      return '0';
-                                    } catch (e) {
-                                      console.error('Error formatting quantity:', e);
-                                      return '0';
-                                    }
-                                  })()}
-                                </td>
-                                <td className="p-3">
-                                  {(() => {
-                                    try {
-                                      if (!row.lastUpdated) return '-';
-                                      if (row.lastUpdated instanceof Date) {
-                                        return row.lastUpdated.toLocaleString();
-                                      }
-                                      return new Date(String(row.lastUpdated)).toLocaleString();
-                                    } catch (e) {
-                                      console.error('Error formatting date:', e);
-                                      return '-';
-                                    }
-                                  })()}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <Card className="material-shadow">
-                    <CardContent className="py-12 text-center">
-                      <div className="material-icons text-6xl text-muted-foreground mb-4">inventory_2</div>
-                      <h3 className="text-xl font-medium mb-2">No Inventory Data</h3>
-                      <p className="text-muted-foreground">
-                        There are no products in the inventory or data could not be retrieved.
-                      </p>
-                    </CardContent>
-                  </Card>
-                )}
-              </>
-            )}
-
-            {/* Customer Report */}
-            {selectedReportType === 'customers' && reportData.topCustomers && (
-              <Card className="material-shadow">
-                <CardHeader>
-                  <CardTitle>Top Customers</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead className="bg-muted">
-                        <tr>
-                          <th className="text-left p-3">Name</th>
-                          <th className="text-left p-3">Email</th>
-                          <th className="text-left p-3">Orders</th>
-                          <th className="text-left p-3">Total Spent</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {reportData.topCustomers.map((c: any) => (
-                          <tr key={c.id} className="border-b border-border">
-                            <td className="p-3">{c.name}</td>
-                            <td className="p-3">{c.email}</td>
-                            <td className="p-3">{c.totalOrders}</td>
-                            <td className="p-3">R {parseFloat(c.totalSpent).toLocaleString()}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Product Report */}
-            {selectedReportType === 'products' && reportData.productPerformance && (
-              <Card className="material-shadow">
-                <CardHeader>
-                  <CardTitle>Product Performance</CardTitle>
+                  <CardTitle>Inventory Details</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="overflow-x-auto">
@@ -1007,20 +1303,60 @@ export default function AdminReports() {
                           <th className="text-left p-3">Product</th>
                           <th className="text-left p-3">Category</th>
                           <th className="text-left p-3">Price</th>
-                          <th className="text-left p-3">Sold</th>
-                          <th className="text-left p-3">Revenue</th>
-                          <th className="text-left p-3">Order Count</th>
+                          <th className="text-left p-3">Qty</th>
+                          <th className="text-left p-3">Last Updated</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {reportData.productPerformance.map((p: any) => (
-                          <tr key={p.productId} className="border-b border-border">
-                            <td className="p-3">{p.name}</td>
-                            <td className="p-3 capitalize">{p.category}</td>
-                            <td className="p-3">R {parseFloat(p.price).toLocaleString()}</td>
-                            <td className="p-3">{p.totalSold}</td>
-                            <td className="p-3">R {parseFloat(p.totalRevenue).toLocaleString()}</td>
-                            <td className="p-3">{p.orderCount}</td>
+                        {reportData.inventoryData.map((row: any, index: number) => (
+                          <tr key={row.productId || index} className="border-b border-border">
+                            <td className="p-3">{typeof row.name === 'string' ? row.name : 'Unknown'}</td>
+                            <td className="p-3 capitalize">{typeof row.category === 'string' ? row.category : 'N/A'}</td>
+                            <td className="p-3">
+                              R {(() => {
+                                try {
+                                  if (!row.price) return '0';
+                                  if (typeof row.price === 'number') return row.price.toLocaleString();
+                                  if (typeof row.price === 'string') {
+                                    const parsedPrice = parseFloat(row.price);
+                                    return !isNaN(parsedPrice) ? parsedPrice.toLocaleString() : '0';
+                                  }
+                                  return '0';
+                                } catch (e) {
+                                  console.error('Error formatting price:', e);
+                                  return '0';
+                                }
+                              })()}
+                            </td>
+                            <td className="p-3">
+                              {(() => {
+                                try {
+                                  if (typeof row.quantity === 'number') return row.quantity.toLocaleString();
+                                  if (typeof row.quantity === 'string') {
+                                    const parsed = parseInt(row.quantity);
+                                    return !isNaN(parsed) ? parsed.toLocaleString() : '0';
+                                  }
+                                  return '0';
+                                } catch (e) {
+                                  console.error('Error formatting quantity:', e);
+                                  return '0';
+                                }
+                              })()}
+                            </td>
+                            <td className="p-3">
+                              {(() => {
+                                try {
+                                  if (!row.lastUpdated) return '-';
+                                  if (row.lastUpdated instanceof Date) {
+                                    return row.lastUpdated.toLocaleString();
+                                  }
+                                  return new Date(String(row.lastUpdated)).toLocaleString();
+                                } catch (e) {
+                                  console.error('Error formatting date:', e);
+                                  return '-';
+                                }
+                              })()}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -1028,160 +1364,6 @@ export default function AdminReports() {
                   </div>
                 </CardContent>
               </Card>
-            )}
-
-            {/* Custom Designs Report - New Format */}
-            {selectedReportType === 'customDesigns' && reportData.customDesignsData && (
-              <>
-                <Card className="material-shadow">
-                  <CardHeader>
-                    <CardTitle>Custom Design Requests Summary</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                      <div className="p-4 border rounded-lg">
-                        <p className="text-sm text-muted-foreground">Total Requests</p>
-                        <p className="text-2xl font-bold">{reportData.totalRequests || 0}</p>
-                      </div>
-                      <div className="p-4 border rounded-lg">
-                        <p className="text-sm text-muted-foreground">Pending</p>
-                        <p className="text-2xl font-bold">{reportData.pendingRequests || 0}</p>
-                      </div>
-                      <div className="p-4 border rounded-lg">
-                        <p className="text-sm text-muted-foreground">Approved</p>
-                        <p className="text-2xl font-bold">{reportData.approvedRequests || 0}</p>
-                      </div>
-                      <div className="p-4 border rounded-lg">
-                        <p className="text-sm text-muted-foreground">Rejected</p>
-                        <p className="text-2xl font-bold">{reportData.rejectedRequests || 0}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="material-shadow">
-                  <CardHeader>
-                    <CardTitle>Custom Design Requests</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead className="bg-muted">
-                          <tr>
-                            <th className="text-left p-3">ID</th>
-                            <th className="text-left p-3">Customer</th>
-                            <th className="text-left p-3">Status</th>
-                            <th className="text-left p-3">Budget</th>
-                            <th className="text-left p-3">Timeline</th>
-                            <th className="text-left p-3">Date</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {reportData.customDesignsData.map((item: any, index: number) => (
-                            <tr key={item.id || index} className="border-b border-border">
-                              <td className="p-3">{item.id || 'N/A'}</td>
-                              <td className="p-3">{typeof item.customer_name === 'string' ? item.customer_name : 'Unknown'}</td>
-                              <td className="p-3 capitalize">{typeof item.status === 'string' ? item.status : 'pending'}</td>
-                              <td className="p-3">{typeof item.budget === 'string' ? item.budget : String(item.budget || '0')}</td>
-                              <td className="p-3">{typeof item.timeline === 'string' ? item.timeline : 'N/A'}</td>
-                              <td className="p-3">
-                                {item.created_at ? 
-                                  (() => {
-                                    try {
-                                      return new Date(item.created_at).toLocaleString();
-                                    } catch {
-                                      return '-';
-                                    }
-                                  })() 
-                                  : '-'}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </CardContent>
-                </Card>
-              </>
-            )}
-
-            {/* Custom Designs Report - Old Format */}
-            {selectedReportType === 'custom_designs' && (reportData.statusBreakdown || reportData.recentRequests) && (
-              <>
-                {reportData.statusBreakdown && (
-                  <Card className="material-shadow">
-                    <CardHeader>
-                      <CardTitle>Status Breakdown</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {reportData.statusBreakdown.map((s: any, index: number) => (
-                          <div key={s.status || index} className="p-4 border rounded-lg">
-                            <p className="text-sm text-muted-foreground capitalize">{typeof s.status === 'string' ? s.status : 'unknown'}</p>
-                            <p className="text-2xl font-bold">{typeof s.count === 'number' ? s.count : (parseInt(String(s.count)) || 0)}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-
-                {reportData.recentRequests && (
-                  <Card className="material-shadow">
-                    <CardHeader>
-                      <CardTitle>Recent Custom Design Requests</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="overflow-x-auto">
-                        <table className="w-full">
-                          <thead className="bg-muted">
-                            <tr>
-                              <th className="text-left p-3">Customer</th>
-                              <th className="text-left p-3">Type</th>
-                              <th className="text-left p-3">Status</th>
-                              <th className="text-left p-3">Quote</th>
-                              <th className="text-left p-3">Date</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {reportData.recentRequests.map((r: any, index: number) => (
-                              <tr key={r.designId || index} className="border-b border-border">
-                                <td className="p-3">{typeof r.customerName === 'string' ? r.customerName : 'Unknown'}</td>
-                                <td className="p-3">{typeof r.furnitureType === 'string' ? r.furnitureType : 'Unknown'}</td>
-                                <td className="p-3 capitalize">{typeof r.status === 'string' ? r.status : 'unknown'}</td>
-                                <td className="p-3">
-                                  {r.quoteAmount ? 
-                                    `R ${(() => {
-                                      if (typeof r.quoteAmount === 'number') return r.quoteAmount.toLocaleString();
-                                      try {
-                                        const parsed = parseFloat(r.quoteAmount);
-                                        return !isNaN(parsed) ? parsed.toLocaleString() : '0';
-                                      } catch {
-                                        return '0';
-                                      }
-                                    })()}` 
-                                    : '-'}
-                                </td>
-                                <td className="p-3">
-                                  {r.createdAt ? 
-                                    (() => {
-                                      try {
-                                        return new Date(r.createdAt).toLocaleString();
-                                      } catch {
-                                        return '-';
-                                      }
-                                    })() 
-                                    : '-'}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-              </>
             )}
           </div>
         ) : (

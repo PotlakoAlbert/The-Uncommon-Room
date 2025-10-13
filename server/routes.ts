@@ -760,8 +760,51 @@ export function registerRoutes(app: Express): void {
 
   app.get('/api/admin/custom-designs', authenticateToken, requireAdmin, async (req, res) => {
     try {
+      console.log('[API] Getting all custom design requests...');
       const requests = await storage.getAllCustomDesignRequests();
-      res.json(requests);
+      console.log('[API] Raw storage result:', {
+        count: requests.length,
+        firstItem: requests[0],
+        hasUserProperty: !!requests[0]?.user
+      });
+      
+      // Transform the data structure to match frontend expectations
+      const transformedRequests = requests.map(request => {
+        console.log('[API] Transforming request:', {
+          requestId: request.id,
+          hasUser: !!request.user,
+          userKeys: request.user ? Object.keys(request.user) : 'no user'
+        });
+        
+        return {
+          custom_design_requests: {
+            id: request.id,
+            designId: request.id, // Add designId as fallback
+            userId: request.userId,
+            furnitureType: request.furnitureType,
+            dimensions: request.dimensions,
+            materialPreference: request.materialPreference,
+            colorPreference: request.colorPreference,
+            specialRequirements: request.specialRequirements,
+            referenceImages: request.referenceImages,
+            referenceLinks: request.referenceLinks,
+            budgetRange: request.budgetRange,
+            status: request.status,
+            quoteAmount: request.quoteAmount,
+            createdAt: request.createdAt,
+            updatedAt: request.updatedAt,
+          },
+          users: request.user
+        };
+      });
+      
+      console.log('[API] Transformed requests:', {
+        count: transformedRequests.length,
+        firstTransformed: transformedRequests[0],
+        hasCustomDesignRequests: !!transformedRequests[0]?.custom_design_requests
+      });
+      
+      res.json(transformedRequests);
     } catch (error) {
       console.error('Get custom designs error:', error);
       res.status(500).json({ message: 'Failed to fetch custom design requests' });

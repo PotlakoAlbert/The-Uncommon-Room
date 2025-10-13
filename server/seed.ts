@@ -1,5 +1,6 @@
 import { db } from "./db";
-import { users, products, admins, inventory } from "@shared/schema";
+import { users, products, admins, inventory, customDesignRequests } from "@shared/schema";
+import { eq } from "drizzle-orm";
 import bcrypt from "bcrypt";
 
 async function seed() {
@@ -194,7 +195,7 @@ async function seed() {
     console.log(`✅ Created ${createdProducts.length} products`);
 
     // Create inventory for products
-    const inventoryData = createdProducts.map(product => ({
+    const inventoryData = createdProducts.map((product: { prodId: any; price: string; }) => ({
       productId: product.prodId,
       quantity: Math.floor(Math.random() * 20) + 5, // Random quantity between 5-25
       costPrice: (parseFloat(product.price) * 0.6).toString(), // 60% of selling price
@@ -202,6 +203,73 @@ async function seed() {
 
     await db.insert(inventory).values(inventoryData);
     console.log(`✅ Created inventory for ${inventoryData.length} products`);
+
+    // Get the customer user for custom design requests
+    const [customerUser] = await db.select().from(users).where(eq(users.email, "customer@example.com")).limit(1);
+    
+    if (customerUser) {
+      // Create sample custom design requests
+      const sampleCustomDesigns = [
+        {
+          userId: customerUser.id,
+          furnitureType: "Custom Dining Table",
+          dimensions: "250cm x 120cm x 75cm",
+          materialPreference: "Solid Oak",
+          colorPreference: "Natural Wood Finish",
+          specialRequirements: "Need the table to seat 8 people comfortably. Would like built-in extension leaves for when we have guests. Modern farmhouse style preferred.",
+          referenceImages: [
+            "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=800",
+            "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=800"
+          ],
+          referenceLinks: [
+            "https://pinterest.com/pin/dining-table-inspiration",
+            "https://instagram.com/p/custom-table-design"
+          ],
+          budgetRange: "R15,000 - R20,000",
+          status: "submitted" as const,
+        },
+        {
+          userId: customerUser.id,
+          furnitureType: "Custom Bedroom Suite",
+          dimensions: "King size bed with matching side tables",
+          materialPreference: "Walnut",
+          colorPreference: "Dark Wood with Gold Accents",
+          specialRequirements: "Looking for a complete bedroom set including bed frame, two nightstands, and a dresser. Modern contemporary style with clean lines.",
+          referenceImages: [
+            "https://images.unsplash.com/photo-1615529328331-f8917597711f?w=800"
+          ],
+          referenceLinks: [],
+          budgetRange: "R25,000 - R35,000",
+          status: "under_review" as const,
+        },
+        {
+          userId: customerUser.id,
+          furnitureType: "Custom Office Desk",
+          dimensions: "180cm x 80cm x 75cm",
+          materialPreference: "Bamboo",
+          colorPreference: "Natural",
+          specialRequirements: "Need a standing desk with adjustable height. Cable management is important. Minimalist design preferred.",
+          referenceImages: [],
+          referenceLinks: [
+            "https://pinterest.com/pin/standing-desk-ideas"
+          ],
+          budgetRange: "R8,000 - R12,000",
+          status: "quoted" as const,
+          quoteAmount: "10500.00",
+        }
+      ];
+
+      try {
+        await db.insert(customDesignRequests).values(sampleCustomDesigns);
+        console.log(`✅ Created ${sampleCustomDesigns.length} sample custom design requests`);
+      } catch (error: any) {
+        if (error.code === '23505') {
+          console.log("ℹ️ Custom design requests already exist, skipping...");
+        } else {
+          console.error("Failed to create custom design requests:", error);
+        }
+      }
+    }
 
     console.log("\n🎉 Database seeding completed successfully!");
     console.log("\n📋 Admin Credentials:");

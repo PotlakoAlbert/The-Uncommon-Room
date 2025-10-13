@@ -16,8 +16,13 @@ if (!process.env.DATABASE_URL) {
 }
 
 // Configure Neon with WebSocket for serverless environment
+// Try HTTP-based connection first for stability
 neonConfig.webSocketConstructor = ws;
 neonConfig.useSecureWebSocket = true; // Force secure WebSocket
+neonConfig.poolQueryViaFetch = true; // Use fetch for queries when possible
+// Disable pipelining for stability
+neonConfig.pipelineConnect = false;
+neonConfig.pipelineTLS = false;
 
 async function createPool(): Promise<Pool> {
   let DATABASE_URL = process.env.DATABASE_URL;
@@ -84,10 +89,14 @@ async function createPool(): Promise<Pool> {
             rejectUnauthorized: false
           },
           connectionTimeoutMillis: 30000, // 30 seconds
-          idleTimeoutMillis: 60000, // 1 minute
-          max: 5, // Reduce max connections for serverless
+          idleTimeoutMillis: 120000, // 2 minutes (increased)
+          max: 3, // Reduce max connections for serverless (reduced further)
           allowExitOnIdle: true,
           keepAlive: true,
+          // Add query timeout
+          query_timeout: 30000,
+          // Add statement timeout
+          statement_timeout: 30000,
         });
 
         // Test connection before returning pool

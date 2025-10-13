@@ -401,6 +401,67 @@ export default function AdminCustomDesigns() {
           );
         })()}
 
+        {/* Filters */}
+        <Card className="material-shadow mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center text-base">
+              <span className="material-icons mr-2 text-primary">filter_list</span>
+              Quick Filters & Stats
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap items-center gap-6">
+              <div className="flex items-center space-x-2">
+                <span className="text-sm font-medium">View:</span>
+                <select 
+                  className="border border-border rounded px-3 py-1.5 text-sm bg-background"
+                  defaultValue="all"
+                  onChange={(e) => {
+                    // Filter functionality can be implemented here
+                    console.log('Filter changed:', e.target.value);
+                  }}
+                >
+                  <option value="all">All Requests</option>
+                  <option value="with-images">📸 With Images Only</option>
+                  <option value="without-images">🚫 No Images</option>
+                  <option value="pending">⏳ Pending Review</option>
+                  <option value="approved">✅ Approved</option>
+                  <option value="quoted">💰 Quoted</option>
+                </select>
+              </div>
+              
+              {!isLoading && customDesigns && (
+                <div className="flex items-center space-x-4 text-sm">
+                  <div className="flex items-center space-x-1 text-muted-foreground">
+                    <span className="material-icons text-xs">analytics</span>
+                    <span>Total: {customDesigns.length}</span>
+                  </div>
+                  <div className="flex items-center space-x-1 text-blue-600">
+                    <span className="material-icons text-xs">image</span>
+                    <span>
+                      With Images: {customDesigns.filter((item: any) => {
+                        const designData = item.custom_design_requests || item;
+                        const images = Array.isArray(designData?.referenceImages) ? designData.referenceImages : [];
+                        return images.length > 0;
+                      }).length}
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-1 text-green-600">
+                    <span className="material-icons text-xs">cloud_done</span>
+                    <span>
+                      Cloud Images: {customDesigns.reduce((count: number, item: any) => {
+                        const designData = item.custom_design_requests || item;
+                        const images = Array.isArray(designData?.referenceImages) ? designData.referenceImages : [];
+                        return count + images.filter((img: string) => img.includes('res.cloudinary.com')).length;
+                      }, 0)}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Custom Designs Table */}
         <Card className="material-shadow">
           <CardHeader>
@@ -466,6 +527,7 @@ export default function AdminCustomDesigns() {
                           <th className="text-left p-4 font-medium">Request ID</th>
                           <th className="text-left p-4 font-medium">Customer</th>
                           <th className="text-left p-4 font-medium">Furniture Type</th>
+                          <th className="text-left p-4 font-medium">Images</th>
                           <th className="text-left p-4 font-medium">Budget Range</th>
                           <th className="text-left p-4 font-medium">Status</th>
                           <th className="text-left p-4 font-medium">Quote Amount</th>
@@ -527,6 +589,60 @@ export default function AdminCustomDesigns() {
                                 </td>
                                 <td className="p-4 capitalize" data-testid={`text-design-type-${designId}`}>
                                   {designData.furnitureType}
+                                </td>
+                                <td className="p-4" data-testid={`images-design-${designId}`}>
+                                  {(() => {
+                                    const referenceImages = Array.isArray(designData.referenceImages) ? designData.referenceImages : [];
+                                    const referenceLinks = Array.isArray(designData.referenceLinks) ? designData.referenceLinks : [];
+                                    
+                                    // Extract image URLs from links
+                                    const isImageUrl = (url: string) => 
+                                      /(\.png|\.jpg|\.jpeg|\.gif|\.webp|\.bmp|\.svg)(\?.*)?$/i.test(url) || 
+                                      url.includes('res.cloudinary.com') || 
+                                      url.includes('images.unsplash.com');
+                                    
+                                    const imageFromLinks = referenceLinks.filter(isImageUrl);
+                                    const allImages = [...referenceImages, ...imageFromLinks];
+                                    
+                                    if (allImages.length === 0) {
+                                      return (
+                                        <div className="flex items-center text-muted-foreground text-sm">
+                                          <span className="material-icons mr-1 text-xs">image_not_supported</span>
+                                          No images
+                                        </div>
+                                      );
+                                    }
+                                    
+                                    return (
+                                      <div className="flex items-center space-x-1">
+                                        {allImages.slice(0, 3).map((imageUrl, idx) => (
+                                          <div 
+                                            key={idx}
+                                            className="relative group cursor-pointer"
+                                            onClick={() => window.open(imageUrl, '_blank')}
+                                          >
+                                            <img 
+                                              src={imageUrl}
+                                              alt={`Reference ${idx + 1}`}
+                                              className="w-8 h-8 rounded border object-cover hover:scale-110 transition-transform"
+                                              onError={(e) => {
+                                                e.currentTarget.src = '/placeholder-image.png';
+                                              }}
+                                            />
+                                          </div>
+                                        ))}
+                                        {allImages.length > 3 && (
+                                          <div className="flex items-center justify-center w-8 h-8 bg-muted rounded border text-xs font-medium">
+                                            +{allImages.length - 3}
+                                          </div>
+                                        )}
+                                        <div className="ml-2 flex items-center text-xs text-muted-foreground">
+                                          <span className="material-icons mr-1 text-xs">image</span>
+                                          {allImages.length}
+                                        </div>
+                                      </div>
+                                    );
+                                  })()}
                                 </td>
                                 <td className="p-4" data-testid={`text-design-budget-${designId}`}>
                                   {designData.budgetRange || 'Not specified'}
@@ -690,16 +806,48 @@ export default function AdminCustomDesigns() {
                       return (
                         <>
                           {imagesOnly.length > 0 && (
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3">
-                              {imagesOnly.map((image: string, index: number) => (
-                                <img
-                                  key={index}
-                                  src={image}
-                                  alt={`Reference ${index + 1}`}
-                                  className="w-full h-24 object-cover rounded border"
-                                  data-testid={`img-reference-${designData.id}-${index}`}
-                                />
-                              ))}
+                            <div>
+                              <div className="flex items-center justify-between mb-3">
+                                <h5 className="font-medium text-sm">Reference Images ({imagesOnly.length})</h5>
+                                <div className="flex items-center text-xs text-muted-foreground">
+                                  <span className="material-icons mr-1 text-xs">info</span>
+                                  Click to view full size
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3">
+                                {imagesOnly.map((image: string, index: number) => (
+                                  <div 
+                                    key={index}
+                                    className="relative group cursor-pointer bg-gray-50 rounded-lg overflow-hidden border hover:shadow-lg transition-shadow"
+                                    onClick={() => window.open(image, '_blank')}
+                                  >
+                                    <img
+                                      src={image}
+                                      alt={`Reference ${index + 1}`}
+                                      className="w-full h-32 object-cover group-hover:scale-105 transition-transform duration-200"
+                                      data-testid={`img-reference-${designData.id}-${index}`}
+                                      onError={(e) => {
+                                        e.currentTarget.src = '/placeholder-image.png';
+                                        e.currentTarget.alt = 'Image not available';
+                                      }}
+                                    />
+                                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 flex items-center justify-center">
+                                      <span className="material-icons text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                                        zoom_in
+                                      </span>
+                                    </div>
+                                    <div className="absolute bottom-1 right-1 bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded">
+                                      {index + 1}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                              {imagesOnly.some(img => img.includes('res.cloudinary.com')) && (
+                                <div className="flex items-center text-xs text-green-600 bg-green-50 border border-green-200 rounded px-2 py-1 w-fit">
+                                  <span className="material-icons mr-1 text-xs">cloud_done</span>
+                                  Images stored in cloud storage
+                                </div>
+                              )}
                             </div>
                           )}
                           {otherLinks.length > 0 && (

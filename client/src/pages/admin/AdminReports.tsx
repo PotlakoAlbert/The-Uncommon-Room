@@ -12,44 +12,31 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-// Chart components temporarily disabled for build fix
-// TODO: Implement proper recharts components
-const ChartPlaceholder = ({ data, options, ...props }: any) => {
-  const chartTitle = options?.plugins?.title?.text || "Chart";
-  const chartData = data?.datasets?.[0]?.data || [];
-  const chartLabels = data?.labels || [];
-  
-  return (
-    <div className="bg-gray-50 p-6 rounded-lg text-center">
-      <div className="material-icons text-4xl text-gray-400 mb-2">bar_chart</div>
-      <h4 className="font-medium text-gray-600 mb-2">{chartTitle}</h4>
-      <p className="text-sm text-gray-500 mb-4">Chart visualization coming soon</p>
-      {chartLabels.length > 0 && (
-        <div className="text-left max-h-32 overflow-y-auto">
-          {chartLabels.slice(0, 5).map((label: string, index: number) => (
-            <div key={index} className="flex justify-between text-sm py-1 border-b border-gray-200">
-              <span>{label}</span>
-              <span className="font-medium">
-                {chartData[index] ? `${chartData[index]}` : 'N/A'}
-              </span>
-            </div>
-          ))}
-          {chartLabels.length > 5 && (
-            <div className="text-xs text-gray-400 mt-2">
-              ...and {chartLabels.length - 5} more items
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
+import { Bar, Line, Pie, Doughnut } from "react-chartjs-2";
+import {
+  Chart,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  LineElement,
+  PointElement,
+  ArcElement,
+} from "chart.js";
 
-// Placeholder components to replace Chart.js components
-const Bar = ChartPlaceholder;
-const Line = ChartPlaceholder;
-const Pie = ChartPlaceholder;
-const Doughnut = ChartPlaceholder;
+Chart.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  LineElement,
+  PointElement,
+  ArcElement
+);
 
 interface ReportData {
   totalSales: number;

@@ -1,6 +1,7 @@
-import { Pool, neonConfig } from '@neondatabase/serverless';
+import { Pool as NeonPool, neonConfig } from '@neondatabase/serverless';
+import { Pool as PgPool } from 'pg';
 import { drizzle } from 'drizzle-orm/neon-serverless';
-import ws from "ws";
+import { drizzle as drizzlePg } from 'drizzle-orm/node-postgres';
 import * as schema from "@shared/schema";
 import { config } from 'dotenv';
 
@@ -11,20 +12,28 @@ if (process.env.NODE_ENV !== 'production') {
 
 // Set database URL fallback
 if (!process.env.DATABASE_URL) {
-  process.env.DATABASE_URL = 'postgresql://neondb_owner:npg_iqRAj4Yl8XyN@ep-lingering-king-ad0o3wyd-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require';
+  process.env.DATABASE_URL = 'postgresql://neondb_owner:npg_iqRAj4Yl8XyN@ep-lingering-king-ad0o3wyd-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require';
   console.log('⚠️  DATABASE_URL not found, using fallback in db.ts');
 }
 
-// Configure Neon with WebSocket for serverless environment
-// Try HTTP-based connection first for stability
-neonConfig.webSocketConstructor = ws;
-neonConfig.useSecureWebSocket = true; // Force secure WebSocket
-neonConfig.poolQueryViaFetch = true; // Use fetch for queries when possible
-// Disable pipelining for stability
-neonConfig.pipelineConnect = false;
-neonConfig.pipelineTLS = false;
+// Configure based on environment
+const USE_STANDARD_PG = process.env.NODE_ENV === 'development';
 
-async function createPool(): Promise<Pool> {
+if (!USE_STANDARD_PG) {
+  // Production: Use Neon serverless with simplified configuration
+  neonConfig.webSocketConstructor = undefined;
+  neonConfig.useSecureWebSocket = false;
+  neonConfig.poolQueryViaFetch = true;
+  neonConfig.fetchConnectionCache = false;
+  neonConfig.pipelineConnect = false;
+  neonConfig.pipelineTLS = false;
+  
+  console.log('🔧 Using Neon serverless driver for production');
+} else {
+  console.log('🔧 Using standard PostgreSQL driver for development');
+}
+
+async function createPool(): Promise<NeonPool | PgPool> {
   let DATABASE_URL = process.env.DATABASE_URL;
 
   // Double-check fallback (should be set by now)
@@ -33,91 +42,62 @@ async function createPool(): Promise<Pool> {
     DATABASE_URL = 'postgresql://neondb_owner:npg_iqRAj4Yl8XyN@ep-lingering-king-ad0o3wyd-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require';
   }
 
-  // Debug logging
-  console.log('Environment check:', {
-    NODE_ENV: process.env.NODE_ENV,
-    DATABASE_URL_SET: !!DATABASE_URL,
-    DATABASE_URL_LENGTH: DATABASE_URL?.length || 0,
-    DATABASE_URL_STARTS_WITH: DATABASE_URL?.substring(0, 15) || 'N/A'
-  });
-
   // Check for placeholder values that might come from build process
   if (DATABASE_URL === 'placeholder-for-runtime' || DATABASE_URL === 'undefined' || DATABASE_URL === 'null') {
     throw new Error("DATABASE_URL contains placeholder value. Check Railway environment variables configuration.");
   }
 
+  // First try the Neon serverless driver 
   try {
-    // Validate database URL format
-    const dbUrl = new URL(DATABASE_URL);
+    console.log('🧪 Trying Neon serverless driver...');
     
-    // Verify required components
-    if (!dbUrl.protocol.startsWith('postgres')) {
-      throw new Error('Database URL must start with postgres:// or postgresql://');
-    }
-    if (!dbUrl.username) {
-      throw new Error('Database URL must include username');
-    }
-    if (!dbUrl.hostname) {
-      throw new Error('Database URL must include hostname');
-    }
-    if (!dbUrl.pathname || dbUrl.pathname === '/') {
-      throw new Error('Database URL must include database name');
-    }
+    const neonPool = new NeonPool({
+      connectionString: DATABASE_URL,
+    });
 
-    // Add required parameters if missing
-    const params = new URLSearchParams(dbUrl.search);
-    if (!params.has('sslmode')) {
-      params.set('sslmode', 'require');
-    }
-    if (!params.has('pool_timeout')) {
-      params.set('pool_timeout', '30');
-    }
-    // Set explicit connect timeout
-    if (!params.has('connect_timeout')) {
-      params.set('connect_timeout', '10');
-    }
-
-    // Update URL with parameters
-    dbUrl.search = params.toString();
+    // Test the connection
+    const client = await neonPool.connect();
+    await client.query('SELECT 1');
+    client.release();
     
-    // Create pool with retries
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      try {
-        const pool = new Pool({
-          connectionString: dbUrl.toString(),
-          ssl: {
-            rejectUnauthorized: false
-          },
-          connectionTimeoutMillis: 30000, // 30 seconds
-          idleTimeoutMillis: 120000, // 2 minutes (increased)
-          max: 3, // Reduce max connections for serverless (reduced further)
-          allowExitOnIdle: true,
-          keepAlive: true,
-          // Add query timeout
-          query_timeout: 30000,
-          // Add statement timeout
-          statement_timeout: 30000,
-        });
+    console.log('✅ Neon serverless driver connected successfully');
+    return neonPool;
+  } catch (neonError) {
+    console.warn('⚠️ Neon serverless driver failed:', String(neonError));
+    
+    // Fallback to standard PostgreSQL driver
+    try {
+      console.log('🔄 Trying standard PostgreSQL driver...');
+      
+      const pgPool = new PgPool({
+        connectionString: DATABASE_URL,
+        ssl: {
+          rejectUnauthorized: false
+        },
+        connectionTimeoutMillis: 10000,
+        idleTimeoutMillis: 30000,
+        max: 1,
+        allowExitOnIdle: true,
+      });
 
-        // Test connection before returning pool
-        await pool.connect();
-        console.log('Database connection test successful');
-        return pool;
-      } catch (err) {
-        console.error(`Connection attempt ${attempt} failed:`, err);
-        if (attempt === 3) throw err;
-        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-      }
+      // Test the connection
+      const client = await pgPool.connect();
+      await client.query('SELECT 1');
+      client.release();
+      
+      console.log('✅ Standard PostgreSQL driver connected successfully');
+      return pgPool;
+    } catch (pgError) {
+      console.error('❌ Both drivers failed');
+      console.error('Neon error:', String(neonError));
+      console.error('PG error:', String(pgError));
+      throw pgError;
     }
-    throw new Error('Failed to create pool after all attempts');
-  } catch (error) {
-    console.error('Error configuring database connection:', error);
-    throw error;
   }
 }
 
 // Immediate initialization with error handling
-let poolInstance: Pool;
+let poolInstance: NeonPool | PgPool;
 let dbInstance: any;
 
 async function initializeDatabase() {
@@ -127,10 +107,21 @@ async function initializeDatabase() {
 
   try {
     poolInstance = await createPool();
-    dbInstance = drizzle(poolInstance, { 
-      schema,
-      logger: process.env.NODE_ENV !== 'production'
-    });
+    
+    // Handle different pool types for drizzle
+    if (poolInstance instanceof NeonPool) {
+      dbInstance = drizzle(poolInstance, { 
+        schema,
+        logger: process.env.NODE_ENV !== 'production'
+      });
+    } else {
+      // For standard PG pool, we need to use a different drizzle adapter
+      const { drizzle: drizzlePg } = await import('drizzle-orm/node-postgres');
+      dbInstance = drizzlePg(poolInstance, { 
+        schema,
+        logger: process.env.NODE_ENV !== 'production'
+      });
+    }
     
     console.log('✅ Database initialized successfully');
     return { pool: poolInstance, db: dbInstance };
@@ -145,7 +136,7 @@ const dbPromise = initializeDatabase();
 
 // Export synchronous db and pool for backwards compatibility
 export let db: any;
-export let pool: Pool;
+export let pool: NeonPool | PgPool;
 
 // Initialize and set the exports
 dbPromise.then(({ db: initializedDb, pool: initializedPool }) => {

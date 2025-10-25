@@ -190,10 +190,10 @@ export class DatabaseStorage implements IStorage {
       conditions.push(lte(products.price, filters.maxPrice.toString()));
     }
     if (filters?.material) {
-      conditions.push(like(products.material, `%${filters.material}%`));
+      conditions.push(sql`${products.material} ILIKE ${'%' + filters.material + '%'}`);
     }
     if (filters?.search) {
-      conditions.push(like(products.name, `%${filters.search}%`));
+      conditions.push(sql`${products.name} ILIKE ${'%' + filters.search + '%'}`);
     }
 
     const query = db
@@ -224,10 +224,10 @@ export class DatabaseStorage implements IStorage {
       conditions.push(lte(products.price, filters.maxPrice.toString()));
     }
     if (filters?.material) {
-      conditions.push(like(products.material, `%${filters.material}%`));
+      conditions.push(sql`${products.material} ILIKE ${'%' + filters.material + '%'}`);
     }
     if (filters?.search) {
-      conditions.push(like(products.name, `%${filters.search}%`));
+      conditions.push(sql`${products.name} ILIKE ${'%' + filters.search + '%'}`);
     }
 
     return await db

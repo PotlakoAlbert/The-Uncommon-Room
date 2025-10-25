@@ -97,28 +97,6 @@ async function build() {
       },
     });
 
-    // Create function.json for Azure Functions (if needed)
-    const functionJson = {
-      "bindings": [
-        {
-          "authLevel": "anonymous",
-          "type": "httpTrigger",
-          "direction": "in",
-          "name": "req",
-          "methods": ["get", "post", "put", "delete"],
-          "route": "{*route}"
-        },
-        {
-          "type": "http",
-          "direction": "out",
-          "name": "res"
-        }
-      ]
-    };
-
-    // Write function.json
-    await writeFile('api/function.json', JSON.stringify(functionJson, null, 2));
-
     console.log('Build completed successfully!');
   } catch (error) {
     console.error('Build failed:', error);

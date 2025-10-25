@@ -177,6 +177,7 @@ export class DatabaseStorage implements IStorage {
     maxPrice?: number; 
     material?: string; 
     search?: string 
+    
   }): Promise<Product[]> {
     let conditions = [eq(products.active, true)];
     
@@ -193,7 +194,7 @@ export class DatabaseStorage implements IStorage {
       conditions.push(sql`${products.material} ILIKE ${'%' + filters.material + '%'}`);
     }
     if (filters?.search) {
-      conditions.push(sql`${products.name} ILIKE ${'%' + filters.search + '%'}`);
+      conditions.push(sql`LOWER(${products.name}) LIKE LOWER(${'%' + filters.search + '%'})`);
     }
 
     const query = db

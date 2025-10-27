@@ -194,7 +194,7 @@ export class DatabaseStorage implements IStorage {
       conditions.push(sql`${products.material} ILIKE ${'%' + filters.material + '%'}`);
     }
     if (filters?.search) {
-      conditions.push(sql`LOWER(${products.name}) LIKE LOWER(${'%' + filters.search + '%'})`);
+      conditions.push(sql`${products.name} ILIKE ${'%' + filters.search + '%'}`);
     }
 
     const query = db
